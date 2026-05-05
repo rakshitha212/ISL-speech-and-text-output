@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Speech to Sign</title>
+</head>
+<body style="text-align:center; font-family: Arial;">
+    <h2>Speech to Text with Sign Output</h2>
+
+    <button onclick="startSpeech()" style="padding:10px 20px; font-size: 1.2em; cursor: pointer;">
+        Start Speaking
+    </button>
+
+    <h3 id="text" style="margin-top: 20px;"></h3>
+
+    <div id="gesture-container" style="margin-top: 20px; min-height: 250px;">
+        <img id="gesture" width="300">
+    </div>
+
+    <br><br>
+    <a href="/">Go Back</a>
+
+    <script>
+        function startSpeech() {
+            const textElement = document.getElementById("text");
+            const gestureElement = document.getElementById("gesture");
+            
+            textElement.innerText = "Listening...";
+            gestureElement.src = "";
+
+            fetch('/speech_to_sign', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    textElement.innerText = data.text;
+                    
+                    if (Array.isArray(data.gestures)) {
+                        // Handle letter-by-letter display
+                        displaySequence(data.gestures);
+                    } else {
+                        gestureElement.src = data.gesture;
+                    }
+                })
+                .catch(err => {
+                    textElement.innerText = "Error: " + err;
+                });
+        }
+
+        async function displaySequence(gestures) {
+            const gestureElement = document.getElementById("gesture");
+            for (let g of gestures) {
+                gestureElement.src = g;
+                // Wait for 1 second before showing next letter
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+        }
+    </script>
+</body>
+</html>
