@@ -199,16 +199,23 @@
   }
   
   .importance-text {
-    flex: 1 1 500px;
+    flex: 1 1 100%;
+    text-align: center;
+    max-width: 900px;
+    margin: 0 auto;
   }
   
   .importance-text h2 {
-    font-size: 36px;
-    margin-bottom: 20px;
+    font-size: 42px;
+    margin-bottom: 25px;
+    color: white;
   }
   
   .importance-text p {
-    margin-bottom: 15px;
+    margin-bottom: 20px;
+    font-size: 18px;
+    color: #bdc3c7;
+    line-height: 1.8;
   }
   
   .importance-image {

@@ -47,7 +47,8 @@ def camera_loop():
     mp_hol = mp.solutions.holistic
     mp_draw = mp.solutions.drawing_utils
 
-    SEQ_LEN = 30
+    # Real-time buffer (3 seconds at 30fps)
+    BUFFER_LEN = 90 
     seq = []
     last_word = ""
     stable_count = 0
@@ -57,7 +58,7 @@ def camera_loop():
         cap = cv2.VideoCapture(0)
 
     holistic = mp_hol.Holistic(
-        model_complexity=0,
+        model_complexity=1,
         min_detection_confidence=0.5,
         min_tracking_confidence=0.5
     )
@@ -68,9 +69,16 @@ def camera_loop():
             continue
 
         h, w = frame.shape[:2]
-
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         res = holistic.process(rgb)
+
+        # DRAW LANDMARKS
+        if res.pose_landmarks:
+            mp_draw.draw_landmarks(frame, res.pose_landmarks, mp_hol.POSE_CONNECTIONS)
+        if res.left_hand_landmarks:
+            mp_draw.draw_landmarks(frame, res.left_hand_landmarks, mp_hol.HAND_CONNECTIONS)
+        if res.right_hand_landmarks:
+            mp_draw.draw_landmarks(frame, res.right_hand_landmarks, mp_hol.HAND_CONNECTIONS)
 
         feats = []
 
@@ -99,41 +107,58 @@ def camera_loop():
             else:
                 feats.extend([0.0] * 42)
 
-        # Add to sequence
+        # Add to sequence buffer
         seq.append(feats)
-        if len(seq) > SEQ_LEN:
+        if len(seq) > BUFFER_LEN:
             seq.pop(0)
 
         # =========================
-        # LSTM PREDICTION (FIXED)
+        # LSTM PREDICTION
         # =========================
         if detection_active and custom_model is not None:
-            if len(seq) == SEQ_LEN:
+            if len(seq) < BUFFER_LEN:
+                current_word = f"Analyzing... {len(seq)}/{BUFFER_LEN}"
+            else:
+                # Sub-sample 30 frames from the 90-frame buffer (every 3rd frame)
+                # This captures a 3-second history which matches gesture lengths
+                sample_seq = seq[::3] 
+                sequence = np.array(sample_seq)
 
-                sequence = np.array(seq)
-
-                # NORMALIZATION (Relative to first frame)
+                # NORMALIZATION
                 sequence = sequence - sequence[0]
                 sequence = sequence / (np.max(np.abs(sequence)) + 1e-6)
-
-                sequence = sequence.reshape(1, SEQ_LEN, 150)
+                sequence = sequence.reshape(1, 30, 150)
 
                 pred = custom_model.predict(sequence, verbose=0)[0]
                 conf = float(np.max(pred))
                 word = custom_labels[int(np.argmax(pred))]
 
-                # Stability logic
-                if word == last_word:
-                    stable_count += 1
-                else:
-                    stable_count = 0
-
-                last_word = word
-
-                if stable_count > 5 and conf > 0.70:
-                    current_word = word
+                # Stability & Output Logic
+                if conf > 0.75:
+                    if word == last_word:
+                        stable_count += 1
+                    else:
+                        stable_count = 0
+                        last_word = word
+                    
+                    if stable_count >= 2:
+                        current_word = word
+                elif conf > 0.45:
+                    current_word = f"? {word} ({int(conf*100)}%)"
                 else:
                     current_word = ""
+
+        # Status Messaging
+        status_msg = "READY"
+        status_color = (0, 255, 0)
+        if not res.left_hand_landmarks and not res.right_hand_landmarks:
+            status_msg = "HANDS NOT DETECTED"
+            status_color = (0, 0, 255)
+        elif not res.pose_landmarks:
+            status_msg = "BODY NOT DETECTED"
+            status_color = (0, 0, 255)
+            
+        cv2.putText(frame, status_msg, (10, h - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, status_color, 2)
 
         # Flip frame
         frame = cv2.flip(frame, 1)

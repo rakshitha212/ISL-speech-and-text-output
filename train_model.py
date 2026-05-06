@@ -90,10 +90,13 @@ for label_idx, class_name in enumerate(classes):
         sequence = sequence / (np.max(np.abs(sequence)) + 1e-6)
 
         # ==============================
-        # FIX SEQUENCE LENGTH (Padding/Truncating)
+        # FIX SEQUENCE LENGTH (Uniform Sampling)
         # ==============================
         if sequence.shape[0] > MAX_FRAMES:
-            sequence = sequence[:MAX_FRAMES]
+            # Sample MAX_FRAMES evenly from the entire sequence
+            # This ensures we see the start, middle, and end of the gesture
+            indices = np.linspace(0, sequence.shape[0] - 1, MAX_FRAMES).astype(int)
+            sequence = sequence[indices]
         else:
             padding = np.zeros((MAX_FRAMES - sequence.shape[0], FEATURES))
             sequence = np.vstack((sequence, padding))
