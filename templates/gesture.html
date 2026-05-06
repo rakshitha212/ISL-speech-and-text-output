@@ -1,198 +1,116 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ISL Gesture Recognition</title>
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-            font-family: 'Segoe UI', sans-serif;
-            background: #0f0f1a;
-            color: #fff;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 20px;
-        }
-        h1 {
-            font-size: 1.8em;
-            background: linear-gradient(135deg, #00c6ff, #0072ff);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            margin-bottom: 5px;
-        }
-        .subtitle { color: #aaa; font-size: 0.9em; margin-bottom: 20px; }
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gesture to Speech - Indian Sign Language Detection</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+    <!-- Font Awesome for icons -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+    />
+  </head>
+  <body>
+    <!-- Header -->
+    <header id="header">
+      <div class="container">
+        <nav>
+          <div class="logo"><i class="fas fa-sign-language"></i> ISLD</div>
+          <ul class="nav-links">
+            <li><a href="/">Home</a></li>
+            <li><a href="/gesture" class="active">Gesture to Speech</a></li>
+            <li><a href="/speech">Speech to Gesture</a></li>
+            <li><a href="/about">About</a></li>
+          </ul>
+          <div class="hamburger">
+            <i class="fas fa-bars"></i>
+          </div>
+        </nav>
+      </div>
+    </header>
 
-        .video-container {
-            position: relative;
-            width: 640px;
-            max-width: 95vw;
-            border-radius: 16px;
-            overflow: hidden;
-            box-shadow: 0 0 40px rgba(0, 114, 255, 0.4);
-            background: #111;
-        }
-        #videoFeed {
-            width: 100%;
-            display: block;
-        }
-        .loading-overlay {
-            position: absolute;
-            inset: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            background: rgba(0,0,0,0.85);
-            font-size: 1.1em;
-            color: #aaa;
-            gap: 15px;
-        }
-        .spinner {
-            width: 50px; height: 50px;
-            border: 4px solid #333;
-            border-top-color: #0072ff;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
-
-        .result-box {
-            margin-top: 20px;
-            background: #1a1a2e;
-            border: 1px solid #0072ff44;
-            border-radius: 16px;
-            padding: 20px 40px;
-            text-align: center;
-            width: 640px;
-            max-width: 95vw;
-        }
-        #detectedWord {
-            font-size: 3em;
-            font-weight: 700;
-            color: #00ff88;
-            letter-spacing: 4px;
-            min-height: 60px;
-            display: block;
-        }
-        .result-label { color: #666; font-size: 0.85em; margin-top: 5px; }
-
-        .words-box {
-            margin-top: 15px;
-            background: #111;
-            border-radius: 12px;
-            padding: 15px 20px;
-            width: 640px;
-            max-width: 95vw;
-            font-size: 0.82em;
-            color: #888;
-            line-height: 1.8;
-        }
-        .words-box strong { color: #aaa; display: block; margin-bottom: 5px; }
-
-        .controls {
-            display: flex;
-            align-items: center;
-            gap: 14px;
-            margin-top: 14px;
-            width: 640px;
-            max-width: 95vw;
-        }
-        .btn-start, .btn-stop {
-            padding: 10px 28px;
-            border: none;
-            border-radius: 30px;
-            font-size: 1em;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        .btn-start {
-            background: linear-gradient(135deg, #ff4d4d, #cc0000);
-            color: #fff;
-            box-shadow: 0 4px 15px rgba(255,0,0,0.3);
-        }
-        .btn-start:hover { transform: scale(1.04); box-shadow: 0 6px 20px rgba(255,0,0,0.5); }
-        .btn-resume {
-            background: linear-gradient(135deg, #00c853, #007a33);
-            color: #fff;
-            box-shadow: 0 4px 15px rgba(0,200,80,0.3);
-        }
-        .btn-resume:hover { transform: scale(1.04); box-shadow: 0 6px 20px rgba(0,200,80,0.5); }
-        .status-dot {
-            width: 14px; height: 14px;
-            border-radius: 50%;
-            flex-shrink: 0;
-        }
-        .status-dot.running { background: #00ff88; box-shadow: 0 0 8px #00ff88; animation: pulse 1.2s infinite; }
-        .status-dot.stopped { background: #ff4444; box-shadow: 0 0 8px #ff4444; }
-        @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
-        .status-label { color: #aaa; font-size: 0.9em; }
-
-        .back-btn {
-            margin-top: 20px;
-            color: #0072ff;
-            text-decoration: none;
-            font-size: 0.95em;
-        }
-        .back-btn:hover { text-decoration: underline; }
-    </style>
-</head>
-<body>
-    <h1>🤟 ISL Gesture to Word</h1>
-    <p class="subtitle">76 words supported · Real-time AI Recognition</p>
-
-    <div class="video-container">
-        <img id="videoFeed" src="{{ url_for('video_feed') }}"
-             onload="document.getElementById('loadingOverlay').style.display='none'"
-             onerror="this.onerror=null; setTimeout(() => this.src=this.src, 2000);"
-             alt="Camera Feed">
-        <div class="loading-overlay" id="loadingOverlay">
-            <div class="spinner"></div>
-            <span>Starting camera...</span>
+    <!-- Gesture to Text Page -->
+    <section id="gesture-to-text-page" class="conversion-page">
+      <div class="container">
+        <div class="conversion-container">
+          <div class="conversion-header">
+            <h1>Gesture to Speech and Text Conversion</h1>
+            <p>
+              Convert Indian Sign Language gestures into written text and speech in real-time.
+            </p>
+          </div>
+          <div class="conversion-box">
+            <div id="camera-container" style="display: none; margin-bottom: 20px;">
+              <img id="video-feed" style="width: 100%; max-width: 640px; border-radius: 10px; border: 3px solid var(--primary);" />
+            </div>
+            <div id="placeholder-container">
+              <i class="fas fa-camera"></i>
+              <h3>Capture Gesture</h3>
+              <p>
+                Position your hand in front of the camera to capture your sign
+                language gesture.
+              </p>
+            </div>
+            <button id="enable-camera-btn" class="btn">Enable Camera</button>
+          </div>
+          <div class="conversion-result">
+            <h3>Detected Text</h3>
+            <p id="text-result" style="font-size: 24px; font-weight: bold; color: var(--primary);">Your detected text will appear here...</p>
+          </div>
         </div>
-    </div>
+      </div>
+    </section>
 
-    <!-- Start / Stop Controls -->
-    <div class="controls">
-        <button id="toggleBtn" class="btn-start" onclick="toggleDetection()">
-            <span id="btnIcon">⏸</span> <span id="btnText">Stop Detection</span>
-        </button>
-        <div id="statusDot" class="status-dot running"></div>
-        <span id="statusLabel" class="status-label">Detection Running</span>
-    </div>
+    <!-- Footer -->
+    <footer>
+      <div class="container">
+        <div class="footer-content">
+          <div class="footer-column">
+            <!-- Empty column for layout balance -->
+          </div>
+          <div class="footer-column">
+            <h3>Navigation</h3>
+            <ul>
+              <li><a href="/">Home</a></li>
+              <li><a href="/gesture">Gesture to Speech</a></li>
+              <li><a href="/speech">Speech to Gesture</a></li>
+              <li><a href="/about">About</a></li>
+            </ul>
+          </div>
+          <div class="footer-column">
+            <h3>Contact Us</h3>
+            <ul>
+              <li>
+                <i class="fas fa-envelope"></i> Jupiterking technology.com
+              </li>
+              <li><i class="fas fa-phone"></i> +91 1234567890</li>
+              <li><i class="fas fa-map-marker-alt"></i> karnataka, India</li>
+            </ul>
+          </div>
+        </div>
+        <div class="copyright">
+          <p>
+            &copy; 2025 Indian Sign Language Detection Project. All rights
+            reserved.
+          </p>
+        </div>
+      </div>
+    </footer>
 
-    <div class="result-box">
-        <span id="detectedWord">—</span>
-        <p class="result-label">Detected ISL Gesture</p>
-    </div>
-
-    <div class="words-box">
-        <strong>Supported Gestures (76 words):</strong>
-        afternoon, animal, bad, beautiful, big, bird, blind, cat, cheap, clothing, cold, cow, curved,
-        deaf, dog, dress, dry, evening, expensive, famous, fast, female, fish, flat, friday, good,
-        happy, hat, healthy, horse, hot, hour, light, long, loose, loud, minute, monday, month,
-        morning, mouse, narrow, new, night, old, pant, pocket, quiet, sad, saturday, second, shirt,
-        shoes, short, sick, skirt, slow, small, suit, sunday, t_shirt, tall, thursday, time, today,
-        tomorrow, tuesday, ugly, warm, wednesday, week, wet, wide, year, yesterday, young
-    </div>
-
-    <a href="/" class="back-btn">← Go Back</a>
-
+    <!-- JavaScript -->
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    
     <script>
-        let lastWord = "";
-        let isDetecting = true;
-        const wordEl = document.getElementById("detectedWord");
-        const toggleBtn = document.getElementById("toggleBtn");
-        const btnIcon  = document.getElementById("btnIcon");
-        const btnText  = document.getElementById("btnText");
-        const statusDot = document.getElementById("statusDot");
-        const statusLabel = document.getElementById("statusLabel");
+        let lastConfidentWord = "";
+        let isDetecting = false;
+        let pollInterval;
+        
+        const wordEl = document.getElementById("text-result");
+        const enableBtn = document.getElementById("enable-camera-btn");
+        const videoFeed = document.getElementById("video-feed");
+        const cameraContainer = document.getElementById("camera-container");
+        const placeholderContainer = document.getElementById("placeholder-container");
 
         function speak(text) {
             if ('speechSynthesis' in window) {
@@ -203,47 +121,76 @@
             }
         }
 
-        async function toggleDetection() {
-            try {
-                const r = await fetch('/toggle_detection', { method: 'POST' });
-                const d = await r.json();
-                isDetecting = d.active;
-                updateUI();
-            } catch(e) { console.error(e); }
-        }
+        enableBtn.addEventListener("click", async function() {
+            if (!isDetecting) {
+                // start camera
+                videoFeed.src = "{{ url_for('video_feed') }}";
+                cameraContainer.style.display = "block";
+                placeholderContainer.style.display = "none";
+                enableBtn.textContent = "Stop Camera";
+                isDetecting = true;
+                lastConfidentWord = "";
+                wordEl.textContent = "Analyzing... Please hold your gesture.";
 
-        function updateUI() {
-            if (isDetecting) {
-                btnIcon.textContent  = '⏸';
-                btnText.textContent  = 'Stop Detection';
-                toggleBtn.className  = 'btn-start';
-                statusDot.className  = 'status-dot running';
-                statusLabel.textContent = 'Detection Running';
+                // Make sure detection is active in backend
+                try {
+                    const r = await fetch('/detection_status');
+                    const d = await r.json();
+                    if (!d.active) {
+                        await fetch('/toggle_detection', { method: 'POST' });
+                    }
+                } catch(e) {}
+
+                // Poll silently in background to capture the last good gesture
+                pollInterval = setInterval(async () => {
+                    if (!isDetecting) return;
+                    try {
+                        const r = await fetch('/get_gesture');
+                        const d = await r.json();
+                        // Save word only if it's confident (no "?")
+                        if (d.word && !d.word.startsWith("?") && d.word !== "") {
+                            lastConfidentWord = d.word;
+                        }
+                    } catch (e) {}
+                }, 400);
+
             } else {
-                btnIcon.textContent  = '▶';
-                btnText.textContent  = 'Start Detection';
-                toggleBtn.className  = 'btn-resume';
-                statusDot.className  = 'status-dot stopped';
-                statusLabel.textContent = 'Detection Paused';
-                wordEl.textContent   = '—';
-                lastWord = '';
-            }
-        }
+                // stop camera
+                isDetecting = false;
+                clearInterval(pollInterval);
+                
+                // hide camera
+                videoFeed.src = "";
+                cameraContainer.style.display = "none";
+                placeholderContainer.style.display = "block";
+                enableBtn.textContent = "Enable Camera";
 
-        async function poll() {
-            if (!isDetecting) return;
-            try {
-                const r = await fetch('/get_gesture');
-                const d = await r.json();
-                if (d.word && d.word !== lastWord) {
-                    wordEl.textContent = d.word.toUpperCase();
-                    speak(d.word);
-                    lastWord = d.word;
+                // Toggle detection off in backend
+                try {
+                    await fetch('/toggle_detection', { method: 'POST' });
+                } catch(e) {}
+                
+                // Output the result exactly once after stopping
+                if (lastConfidentWord) {
+                    let cleanWord = lastConfidentWord.replace("?", "").trim();
+                    wordEl.textContent = cleanWord.toUpperCase();
+                    speak(cleanWord);
+                } else {
+                    wordEl.textContent = "No confident gesture detected. Please try again.";
                 }
-            } catch (e) {}
-        }
-
-        setInterval(poll, 500);
+            }
+        });
     </script>
-</body>
+    
+    <!-- Google Translate -->
+    <div id="google_translate_element" style="position: fixed;bottom: 30px;right: 20px;z-index: 1000;"></div>
+    <script type="text/javascript">
+      function googleTranslateElementInit() {
+        new google.translate.TranslateElement({
+          pageLanguage: 'en', 
+        }, 'google_translate_element');
+      }
+    </script>
+    <script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+  </body>
 </html>

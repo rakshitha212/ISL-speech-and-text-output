@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>About Us - Indian Sign Language Detection</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+    />
+    <style>
+        .about-section {
+            margin-bottom: 30px;
+        }
+        .about-section h2 {
+            color: var(--primary);
+            margin-bottom: 15px;
+            border-bottom: 2px solid var(--light);
+            padding-bottom: 10px;
+        }
+        .about-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .about-card {
+            background: var(--light);
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: var(--shadow);
+        }
+        .about-card i {
+            font-size: 30px;
+            color: var(--secondary);
+            margin-bottom: 10px;
+        }
+        .about-card h3 {
+            margin-bottom: 10px;
+            color: var(--dark);
+        }
+        .about-card p {
+            font-size: 14px;
+            color: #666;
+        }
+    </style>
+  </head>
+  <body>
+    <!-- Header -->
+    <header id="header">
+      <div class="container">
+        <nav>
+          <div class="logo"><i class="fas fa-sign-language"></i> ISLD</div>
+          <ul class="nav-links">
+            <li><a href="/">Home</a></li>
+            <li><a href="/gesture">Gesture to Speech</a></li>
+            <li><a href="/speech">Speech to Gesture</a></li>
+            <li><a href="/about" class="active">About</a></li>
+          </ul>
+          <div class="hamburger">
+            <i class="fas fa-bars"></i>
+          </div>
+        </nav>
+      </div>
+    </header>
+
+    <section class="conversion-page">
+      <div class="container">
+        <div class="conversion-container">
+          <div class="conversion-header">
+            <h1>About the Project</h1>
+            <p>Bridging the communication gap with Artificial Intelligence.</p>
+          </div>
+
+          <div class="about-section">
+            <h2>Our Mission</h2>
+            <p>
+              The Indian Sign Language Detection (ISLD) project aims to empower the deaf and hard-of-hearing community by providing a seamless real-time translation system. We leverage advanced Machine Learning (LSTM models) and Computer Vision to convert complex ISL gestures into spoken language and vice versa.
+            </p>
+          </div>
+
+          <div class="about-section">
+            <h2>Core Features</h2>
+            <div class="about-grid">
+                <div class="about-card">
+                    <i class="fas fa-video"></i>
+                    <h3>Real-time Detection</h3>
+                    <p>Uses MediaPipe for precise landmark tracking and LSTM for temporal gesture recognition.</p>
+                </div>
+                <div class="about-card">
+                    <i class="fas fa-microphone-alt"></i>
+                    <h3>Speech Synthesis</h3>
+                    <p>Converts recognized signs into clear, audible speech instantly.</p>
+                </div>
+                <div class="about-card">
+                    <i class="fas fa-hand-holding-heart"></i>
+                    <h3>Inclusive Design</h3>
+                    <p>Built with a focus on accessibility and ease of use for everyone.</p>
+                </div>
+            </div>
+          </div>
+
+          <div class="about-section">
+            <h2>How it Works</h2>
+            <p>
+              When a user performs a sign in front of the camera, the system extracts 150 feature points representing pose and hand landmarks. These points are processed as a temporal sequence (30 frames) by our custom-trained Neural Network, which identifies the sign with high precision.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+      <div class="container">
+        <div class="footer-content">
+          <div class="footer-column">
+          </div>
+          <div class="footer-column">
+            <h3>Navigation</h3>
+            <ul>
+              <li><a href="/">Home</a></li>
+              <li><a href="/gesture">Gesture to Speech</a></li>
+              <li><a href="/speech">Speech to Gesture</a></li>
+              <li><a href="/about">About</a></li>
+            </ul>
+          </div>
+          <div class="footer-column">
+            <h3>Contact Us</h3>
+            <ul>
+              <li><i class="fas fa-envelope"></i> Jupiterking technology.com</li>
+              <li><i class="fas fa-phone"></i> +91 1234567890</li>
+              <li><i class="fas fa-map-marker-alt"></i> karnataka, India</li>
+            </ul>
+          </div>
+        </div>
+        <div class="copyright">
+          <p>&copy; 2025 Indian Sign Language Detection Project. All rights reserved.</p>
+        </div>
+      </div>
+    </footer>
+    
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <!-- Google Translate -->
+    <div id="google_translate_element" style="position: fixed;bottom: 30px;right: 20px;z-index: 1000;"></div>
+    <script type="text/javascript">
+      function googleTranslateElementInit() {
+        new google.translate.TranslateElement({
+          pageLanguage: 'en', 
+        }, 'google_translate_element');
+      }
+    </script>
+    <script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+  </body>
+</html>

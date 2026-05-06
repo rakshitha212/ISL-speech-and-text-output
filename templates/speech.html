@@ -1,57 +1,179 @@
 <!DOCTYPE html>
-<html>
-<head>
-    <title>Speech to Sign</title>
-</head>
-<body style="text-align:center; font-family: Arial;">
-    <h2>Speech to Text with Sign Output</h2>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Speech to Gesture - Indian Sign Language Detection</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+    <!-- Font Awesome for icons -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+    />
+  </head>
+  <body>
+    <!-- Header -->
+    <header id="header">
+      <div class="container">
+        <nav>
+          <div class="logo"><i class="fas fa-sign-language"></i> ISLD</div>
+          <ul class="nav-links">
+            <li><a href="/">Home</a></li>
+            <li><a href="/gesture">Gesture to Speech</a></li>
+            <li><a href="/speech" class="active">Speech to Gesture</a></li>
+            <li><a href="/about">About</a></li>
+          </ul>
+          <div class="hamburger">
+            <i class="fas fa-bars"></i>
+          </div>
+        </nav>
+      </div>
+    </header>
 
-    <button onclick="startSpeech()" style="padding:10px 20px; font-size: 1.2em; cursor: pointer;">
-        Start Speaking
-    </button>
+    <!-- Speech to Gesture Page -->
+    <section id="speech-to-gesture-page" class="conversion-page">
+      <div class="container">
+        <div class="conversion-container">
+          <div class="conversion-header">
+            <h1>Speech to Gesture Conversion</h1>
+            <p>
+              Convert spoken words into Indian Sign Language gestures.
+            </p>
+          </div>
+          <div class="conversion-box">
+            <div id="placeholder-container">
+              <i class="fas fa-microphone"></i>
+              <h3>Speak Now</h3>
+              <p>
+                Click the button and speak clearly to convert your speech into sign language gestures.
+              </p>
+            </div>
+            <button id="enable-mic-btn" class="btn" onclick="startSpeech()">Enable Microphone</button>
+          </div>
+          <div class="conversion-result">
+            <h3>Gesture sequence</h3>
+            <p id="text-result" style="font-size: 24px; font-weight: bold; color: var(--primary);">Spoken text will appear here...</p>
+            <div id="gesture-container" style="margin-top: 20px; text-align: center; display: none;">
+                <!-- Video player for actual ISL signs -->
+                <video id="gesture-video" style="max-width: 100%; border-radius: 10px; border: 3px solid var(--primary); display: none;" autoplay loop muted playsinline></video>
+                <!-- Image for letter fallback -->
+                <img id="gesture-img" style="max-width: 100%; border-radius: 10px; border: 3px solid var(--primary); display: none;">
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
 
-    <h3 id="text" style="margin-top: 20px;"></h3>
+    <!-- Footer -->
+    <footer>
+      <div class="container">
+        <div class="footer-content">
+          <div class="footer-column">
+            <!-- Empty column for layout balance -->
+          </div>
+          <div class="footer-column">
+            <h3>Navigation</h3>
+            <ul>
+              <li><a href="/">Home</a></li>
+              <li><a href="/gesture">Gesture to Speech</a></li>
+              <li><a href="/speech">Speech to Gesture</a></li>
+              <li><a href="/about">About</a></li>
+            </ul>
+          </div>
+          <div class="footer-column">
+            <h3>Contact Us</h3>
+            <ul>
+              <li>
+                <i class="fas fa-envelope"></i> Jupiterking technology.com
+              </li>
+              <li><i class="fas fa-phone"></i> +91 1234567890</li>
+              <li><i class="fas fa-map-marker-alt"></i> karnataka, India</li>
+            </ul>
+          </div>
+        </div>
+        <div class="copyright">
+          <p>
+            &copy; 2025 Indian Sign Language Detection Project. All rights
+            reserved.
+          </p>
+        </div>
+      </div>
+    </footer>
 
-    <div id="gesture-container" style="margin-top: 20px; min-height: 250px;">
-        <img id="gesture" width="300">
-    </div>
-
-    <br><br>
-    <a href="/">Go Back</a>
-
+    <!-- JavaScript -->
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    
     <script>
+        const gestureVideo = document.getElementById("gesture-video");
+        const gestureImg = document.getElementById("gesture-img");
+        const gestureContainer = document.getElementById("gesture-container");
+
         function startSpeech() {
-            const textElement = document.getElementById("text");
-            const gestureElement = document.getElementById("gesture");
+            const textElement = document.getElementById("text-result");
+            const btn = document.getElementById("enable-mic-btn");
             
             textElement.innerText = "Listening...";
-            gestureElement.src = "";
+            btn.innerText = "Listening...";
+            btn.style.backgroundColor = "#e74c3c"; 
+            gestureContainer.style.display = "none";
+            gestureVideo.src = "";
+            gestureImg.src = "";
+            gestureVideo.style.display = "none";
+            gestureImg.style.display = "none";
 
             fetch('/speech_to_sign', { method: 'POST' })
                 .then(response => response.json())
                 .then(data => {
                     textElement.innerText = data.text;
+                    btn.innerText = "Enable Microphone";
+                    btn.style.backgroundColor = ""; 
                     
+                    if (data.gestures || data.gesture) {
+                        gestureContainer.style.display = "block";
+                    }
+
                     if (Array.isArray(data.gestures)) {
-                        // Handle letter-by-letter display
+                        // Handle letter-by-letter display (GIFs)
                         displaySequence(data.gestures);
-                    } else {
-                        gestureElement.src = data.gesture;
+                    } else if(data.gesture) {
+                        if (data.gesture.endsWith(".mp4")) {
+                            gestureVideo.src = data.gesture;
+                            gestureVideo.style.display = "inline-block";
+                            gestureImg.style.display = "none";
+                            gestureVideo.play();
+                        } else {
+                            gestureImg.src = data.gesture;
+                            gestureImg.style.display = "inline-block";
+                            gestureVideo.style.display = "none";
+                        }
                     }
                 })
                 .catch(err => {
                     textElement.innerText = "Error: " + err;
+                    btn.innerText = "Enable Microphone";
+                    btn.style.backgroundColor = "";
                 });
         }
 
         async function displaySequence(gestures) {
-            const gestureElement = document.getElementById("gesture");
+            gestureImg.style.display = "inline-block";
+            gestureVideo.style.display = "none";
             for (let g of gestures) {
-                gestureElement.src = g;
-                // Wait for 1 second before showing next letter
+                gestureImg.src = g;
                 await new Promise(resolve => setTimeout(resolve, 1000));
             }
         }
     </script>
-</body>
+    
+    <!-- Google Translate -->
+    <div id="google_translate_element" style="position: fixed;bottom: 30px;right: 20px;z-index: 1000;"></div>
+    <script type="text/javascript">
+      function googleTranslateElementInit() {
+        new google.translate.TranslateElement({
+          pageLanguage: 'en', 
+        }, 'google_translate_element');
+      }
+    </script>
+    <script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+  </body>
 </html>
