@@ -34,15 +34,17 @@ if os.path.exists(CUSTOM_MODEL_PATH) and os.path.exists(LABELS_PATH):
 # Global Shared State
 # =========================
 latest_frame = None
-current_word = ""
-detection_active = True
+locked_word = ""
+current_status = "WAITING"
+detection_active = False
+camera_thread = None
 frame_lock = threading.Lock()
 
 # =========================
 # Camera Thread
 # =========================
 def camera_loop():
-    global latest_frame, current_word
+    global latest_frame, locked_word, current_status, detection_active
 
     mp_hol = mp.solutions.holistic
     mp_draw = mp.solutions.drawing_utils
@@ -52,6 +54,7 @@ def camera_loop():
     seq = []
     last_word = ""
     stable_count = 0
+    cooldown_until = 0
 
     cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
     if not cap.isOpened():
@@ -63,7 +66,7 @@ def camera_loop():
         min_tracking_confidence=0.5
     )
 
-    while True:
+    while detection_active:
         ret, frame = cap.read()
         if not ret:
             continue
@@ -115,57 +118,77 @@ def camera_loop():
         # =========================
         # LSTM PREDICTION
         # =========================
-        if detection_active and custom_model is not None:
-            if len(seq) < BUFFER_LEN:
-                current_word = f"Analyzing... {len(seq)}/{BUFFER_LEN}"
-            else:
-                # Sub-sample 30 frames from the 90-frame buffer (every 3rd frame)
-                # This captures a 3-second history which matches gesture lengths
-                sample_seq = seq[::3] 
-                sequence = np.array(sample_seq)
-
-                # NORMALIZATION
-                sequence = sequence - sequence[0]
-                sequence = sequence / (np.max(np.abs(sequence)) + 1e-6)
-                sequence = sequence.reshape(1, 30, 150)
-
-                pred = custom_model.predict(sequence, verbose=0)[0]
-                conf = float(np.max(pred))
-                word = custom_labels[int(np.argmax(pred))]
-
-                # Stability & Output Logic
-                if conf > 0.75:
-                    if word == last_word:
-                        stable_count += 1
-                    else:
-                        stable_count = 0
-                        last_word = word
-                    
-                    if stable_count >= 2:
-                        current_word = word
-                elif conf > 0.45:
-                    current_word = f"? {word} ({int(conf*100)}%)"
-                else:
-                    current_word = ""
-
-        # Status Messaging
         status_msg = "READY"
         status_color = (0, 255, 0)
+        
         if not res.left_hand_landmarks and not res.right_hand_landmarks:
-            status_msg = "HANDS NOT DETECTED"
+            status_msg = "NO HANDS DETECTED"
             status_color = (0, 0, 255)
+            current_status = "No Hands Detected"
         elif not res.pose_landmarks:
             status_msg = "BODY NOT DETECTED"
             status_color = (0, 0, 255)
+            current_status = "Body Not Detected"
+        else:
+            current_status = "Analyzing..."
+            status_msg = "ANALYZING"
+            status_color = (255, 255, 0)
             
+            if custom_model is not None:
+                if len(seq) < BUFFER_LEN:
+                    current_status = f"Buffering... {len(seq)}/{BUFFER_LEN}"
+                else:
+                    # Check if we have enough movement to bother predicting
+                    recent_seq = np.array(seq[-30:])
+                    variance = np.var(recent_seq)
+                    
+                    # If variance is very low, hand is completely still, might be noise
+                    if variance > 0.0001:
+                        # Sub-sample 30 frames from the 90-frame buffer (every 3rd frame)
+                        sample_seq = seq[::3] 
+                        sequence = np.array(sample_seq)
+
+                        # NORMALIZATION
+                        sequence = sequence - sequence[0]
+                        sequence = sequence / (np.max(np.abs(sequence)) + 1e-6)
+                        sequence = sequence.reshape(1, 30, 150)
+
+                        pred = custom_model.predict(sequence, verbose=0)[0]
+                        conf = float(np.max(pred))
+                        word = custom_labels[int(np.argmax(pred))]
+
+                        # Stability & Output Logic
+                        if conf > 0.85: # Increased threshold
+                            if word == last_word:
+                                stable_count += 1
+                            else:
+                                stable_count = 0
+                                last_word = word
+                            
+                            if stable_count >= 4: # Require more stable frames
+                                if time.time() > cooldown_until:
+                                    locked_word = word
+                                    current_status = "LOCKED"
+                                    cooldown_until = time.time() + 2.0 # 2s cooldown
+                                else:
+                                    current_status = "Cooldown..."
+                            else:
+                                current_status = f"Analyzing... {word} ({int(conf*100)}%)"
+                        elif conf > 0.50:
+                            current_status = f"Analyzing... ({int(conf*100)}%)"
+
+        if time.time() > cooldown_until and current_status != "LOCKED":
+             locked_word = "" # Clear the locked word after cooldown if we are analyzing again
+
+        # Draw status
         cv2.putText(frame, status_msg, (10, h - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, status_color, 2)
 
         # Flip frame
         frame = cv2.flip(frame, 1)
 
         # Display word
-        if current_word:
-            cv2.putText(frame, current_word.upper(), (20, 50),
+        if locked_word:
+            cv2.putText(frame, locked_word.upper(), (20, 50),
                         cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 0), 3)
 
         # Encode frame
@@ -174,10 +197,9 @@ def camera_loop():
             latest_frame = buf.tobytes()
 
     cap.release()
+    print("[INFO] Camera thread stopped.")
 
-
-# Start camera thread
-threading.Thread(target=camera_loop, daemon=True).start()
+# Camera thread is no longer started globally on init
 
 # =========================
 # Routes
@@ -200,11 +222,14 @@ def about():
 
 @app.route("/get_gesture")
 def get_gesture():
-    return jsonify({"word": current_word})
+    return jsonify({
+        "word": locked_word,
+        "status": current_status
+    })
 
 @app.route("/current_prediction")
 def current_prediction():
-    return jsonify({"prediction": current_word})
+    return jsonify({"prediction": locked_word})
 
 @app.route("/video_feed")
 def video_feed():
@@ -219,8 +244,27 @@ def video_feed():
 
 @app.route("/toggle_detection", methods=["POST"])
 def toggle_detection():
-    global detection_active
-    detection_active = not detection_active
+    global detection_active, camera_thread, locked_word, current_status
+    data = request.get_json(silent=True) or {}
+    
+    # Allow passing explicit state, else toggle
+    if "active" in data:
+        new_state = bool(data["active"])
+    else:
+        new_state = not detection_active
+
+    if new_state and not detection_active:
+        detection_active = True
+        locked_word = ""
+        current_status = "Starting camera..."
+        if camera_thread is None or not camera_thread.is_alive():
+            camera_thread = threading.Thread(target=camera_loop, daemon=True)
+            camera_thread.start()
+    elif not new_state and detection_active:
+        detection_active = False
+        locked_word = ""
+        current_status = "WAITING"
+        
     return jsonify({"active": detection_active})
 
 @app.route("/detection_status")

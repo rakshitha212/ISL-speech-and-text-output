@@ -32,31 +32,46 @@
 
     <!-- Gesture to Text Page -->
     <section id="gesture-to-text-page" class="conversion-page">
-      <div class="container">
-        <div class="conversion-container">
+      <div class="container-fluid">
+        <div class="gesture-container">
           <div class="conversion-header">
             <h1>Gesture to Speech and Text Conversion</h1>
             <p>
               Convert Indian Sign Language gestures into written text and speech in real-time.
             </p>
           </div>
-          <div class="conversion-box">
-            <div id="camera-container" style="display: none; margin-bottom: 20px;">
-              <img id="video-feed" style="width: 100%; max-width: 640px; border-radius: 10px; border: 3px solid var(--primary);" />
-            </div>
-            <div id="placeholder-container">
-              <i class="fas fa-camera"></i>
-              <h3>Capture Gesture</h3>
-              <p>
-                Position your hand in front of the camera to capture your sign
-                language gesture.
-              </p>
-            </div>
-            <button id="enable-camera-btn" class="btn">Enable Camera</button>
-          </div>
-          <div class="conversion-result">
-            <h3>Detected Text</h3>
-            <p id="text-result" style="font-size: 24px; font-weight: bold; color: var(--primary);">Your detected text will appear here...</p>
+          <div class="split-layout">
+              <div class="camera-panel">
+                  <div class="conversion-box">
+                    <div id="camera-container" style="display: none; margin-bottom: 20px; width: 100%;">
+                      <img id="video-feed" style="width: 100%; border-radius: 10px; border: 3px solid var(--primary);" />
+                    </div>
+                    <div id="placeholder-container">
+                      <i class="fas fa-camera"></i>
+                      <h3>Capture Gesture</h3>
+                      <p>
+                        Position your hand in front of the camera to capture your sign
+                        language gesture.
+                      </p>
+                    </div>
+                    <button id="enable-camera-btn" class="btn" style="margin-top: 20px;">Enable Camera</button>
+                  </div>
+              </div>
+              
+              <div class="result-panel">
+                  <div class="conversion-result" style="position: relative;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h3>Detected Word</h3>
+                        <span id="status-badge" style="padding: 5px 15px; border-radius: 20px; font-size: 14px; font-weight: 600; background: #e0e0e0; color: #333; transition: all 0.3s;">Waiting</span>
+                    </div>
+                    <div style="min-height: 150px; display: flex; align-items: center; justify-content: center; background: #f8f9fa; border-radius: 10px; border: 2px dashed #ddd; flex-grow: 1;">
+                        <p id="text-result" style="font-size: 48px; font-weight: bold; color: #aaa; margin: 0; transition: color 0.3s, transform 0.2s; text-align: center;">...</p>
+                    </div>
+                    <div style="margin-top: 20px; color: #7f8c8d; font-size: 14px; text-align: center;">
+                        <i class="fas fa-info-circle"></i> Word will be automatically spoken when detected.
+                    </div>
+                  </div>
+              </div>
           </div>
         </div>
       </div>
@@ -102,11 +117,12 @@
     <script src="{{ url_for('static', filename='script.js') }}"></script>
     
     <script>
-        let lastConfidentWord = "";
+        let lastSpokenWord = "";
         let isDetecting = false;
         let pollInterval;
         
         const wordEl = document.getElementById("text-result");
+        const statusBadge = document.getElementById("status-badge");
         const enableBtn = document.getElementById("enable-camera-btn");
         const videoFeed = document.getElementById("video-feed");
         const cameraContainer = document.getElementById("camera-container");
@@ -121,63 +137,104 @@
             }
         }
 
+        function updateStatus(status) {
+            statusBadge.textContent = status;
+            if (status.includes("Analyzing")) {
+                statusBadge.style.background = "#fff3cd";
+                statusBadge.style.color = "#856404";
+            } else if (status === "LOCKED") {
+                statusBadge.style.background = "#d4edda";
+                statusBadge.style.color = "#155724";
+            } else if (status.includes("Not") || status.includes("No")) {
+                statusBadge.style.background = "#f8d7da";
+                statusBadge.style.color = "#721c24";
+            } else {
+                statusBadge.style.background = "#e0e0e0";
+                statusBadge.style.color = "#333";
+            }
+        }
+
         enableBtn.addEventListener("click", async function() {
             if (!isDetecting) {
                 // start camera
-                videoFeed.src = "{{ url_for('video_feed') }}";
-                cameraContainer.style.display = "block";
-                placeholderContainer.style.display = "none";
-                enableBtn.textContent = "Stop Camera";
                 isDetecting = true;
-                lastConfidentWord = "";
-                wordEl.textContent = "Analyzing... Please hold your gesture.";
-
-                // Make sure detection is active in backend
+                enableBtn.textContent = "Starting...";
+                enableBtn.disabled = true;
+                
                 try {
-                    const r = await fetch('/detection_status');
-                    const d = await r.json();
-                    if (!d.active) {
-                        await fetch('/toggle_detection', { method: 'POST' });
-                    }
+                    await fetch('/toggle_detection', { 
+                        method: 'POST', 
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({active: true}) 
+                    });
                 } catch(e) {}
 
-                // Poll silently in background to capture the last good gesture
-                pollInterval = setInterval(async () => {
-                    if (!isDetecting) return;
-                    try {
-                        const r = await fetch('/get_gesture');
-                        const d = await r.json();
-                        // Save word only if it's confident (no "?")
-                        if (d.word && !d.word.startsWith("?") && d.word !== "") {
-                            lastConfidentWord = d.word;
-                        }
-                    } catch (e) {}
-                }, 400);
+                // Slight delay to allow camera to initialize
+                setTimeout(() => {
+                    videoFeed.src = "{{ url_for('video_feed') }}";
+                    cameraContainer.style.display = "block";
+                    placeholderContainer.style.display = "none";
+                    enableBtn.textContent = "Stop Camera";
+                    enableBtn.disabled = false;
+                    lastSpokenWord = "";
+                    wordEl.textContent = "...";
+                    wordEl.style.color = "#aaa";
+                    updateStatus("Camera Active");
+
+                    // Poll silently in background
+                    pollInterval = setInterval(async () => {
+                        if (!isDetecting) return;
+                        try {
+                            const r = await fetch('/get_gesture');
+                            const d = await r.json();
+                            
+                            if (d.status) updateStatus(d.status);
+                            
+                            if (d.word && d.word !== "") {
+                                wordEl.textContent = d.word.toUpperCase();
+                                wordEl.style.color = "var(--primary)";
+                                wordEl.style.transform = "scale(1.1)";
+                                setTimeout(() => wordEl.style.transform = "scale(1)", 200);
+                                
+                                if (d.word !== lastSpokenWord) {
+                                    speak(d.word);
+                                    lastSpokenWord = d.word;
+                                }
+                            } else if (d.status.includes("Analyzing") || d.status.includes("Cooldown")) {
+                                // Keep the last locked word visible during cooldown, otherwise fade it
+                                if (d.status.includes("Analyzing")) {
+                                    wordEl.style.color = "#aaa";
+                                }
+                            }
+                        } catch (e) {}
+                    }, 200);
+                }, 1000);
 
             } else {
                 // stop camera
                 isDetecting = false;
                 clearInterval(pollInterval);
+                enableBtn.disabled = true;
+                enableBtn.textContent = "Stopping...";
                 
-                // hide camera
-                videoFeed.src = "";
-                cameraContainer.style.display = "none";
-                placeholderContainer.style.display = "block";
-                enableBtn.textContent = "Enable Camera";
-
-                // Toggle detection off in backend
                 try {
-                    await fetch('/toggle_detection', { method: 'POST' });
+                    await fetch('/toggle_detection', { 
+                        method: 'POST', 
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({active: false}) 
+                    });
                 } catch(e) {}
                 
-                // Output the result exactly once after stopping
-                if (lastConfidentWord) {
-                    let cleanWord = lastConfidentWord.replace("?", "").trim();
-                    wordEl.textContent = cleanWord.toUpperCase();
-                    speak(cleanWord);
-                } else {
-                    wordEl.textContent = "No confident gesture detected. Please try again.";
-                }
+                setTimeout(() => {
+                    videoFeed.src = "";
+                    cameraContainer.style.display = "none";
+                    placeholderContainer.style.display = "block";
+                    enableBtn.textContent = "Enable Camera";
+                    enableBtn.disabled = false;
+                    updateStatus("Waiting");
+                    wordEl.textContent = "...";
+                    wordEl.style.color = "#aaa";
+                }, 500);
             }
         });
     </script>
