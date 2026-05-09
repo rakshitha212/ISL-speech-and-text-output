@@ -43,7 +43,6 @@ instance/
 
 # Datasets & Models
 dataset/
-static/gestures/
 model/checkpoint/
 model/*.keras
 temp/
