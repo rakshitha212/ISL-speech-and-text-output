@@ -10,6 +10,7 @@ This project is a comprehensive translation system designed to bridge the gap be
 ## dataset used 
 https://www.kaggle.com/datasets/kaushikyh/indian-sign-language-words-with-landmarks
 
+## Dataset Tried (Fail)
  🔗 https://www.kaggle.com/datasets/sid321axn/indian-sign-language
 
 
@@ -138,4 +139,4 @@ The application features a premium, modern design:
 
 ---
 
-&copy; 2025 Indian Sign Language Detection Project.
+&copy; 2026 Indian Sign Language Detection Project.
