@@ -13,6 +13,29 @@ https://www.kaggle.com/datasets/kaushikyh/indian-sign-language-words-with-landma
  🔗 https://www.kaggle.com/datasets/sid321axn/indian-sign-language
 
 
+## 📚 Supported Dataset Words
+The system supports a wide range of Indian Sign Language (ISL) signs. These are categorized into real-time recognition classes (LSTM-based) and common synthesis phrases.
+
+### ✋ Gesture Recognition Classes (41)
+These words are used to train the LSTM model for real-time camera-based detection:
+
+*   **Animals:** Animal, Bird, Cat, Cow, Dog, Fish, Horse, Mouse
+*   **Time & Days:** Afternoon, Evening, Friday, Monday, Month, Morning, Hour, Minute
+*   **Adjectives & Emotions:** Bad, Beautiful, Big, Cheap, Cold, Curved, Dry, Expensive, Famous, Fast, Flat, Good, Happy, Healthy, Hot, Light, Long, Loose, Loud
+*   **Clothing & Objects:** Clothing, Dress, Hat
+*   **People:** Blind, Deaf, Female
+
+### 🎤 Speech Synthesis Phrases (Common)
+In addition to the above, the system includes sign library entries for common interactions (accessible via Voice-to-Sign):
+
+*   **Greetings:** Hello, Good Morning, Good Night, Thanks
+*   **Basics:** Yes, No, Please, Sorry, Help
+*   **Needs:** Water, Food, I Love You
+
+### 🔠 Alphabet Finger-Spelling
+The system supports full **A-Z finger-spelling** fallback. If a specific word is not in the library, the system will automatically spell it out letter-by-letter using ISL alphabet signs.
+
+
 ## 🌟 Key Features
 
 ### ✋ 1. Gesture to Speech (Recognition)
@@ -32,7 +55,7 @@ https://www.kaggle.com/datasets/kaushikyh/indian-sign-language-words-with-landma
 
 | Component | Technology |
 | :--- | :--- |
-| **Backend** | Python, Flask |
+| **Backend** | Python 3.10.6, Flask |
 | **Frontend** | HTML5, Modern CSS (Glassmorphism), JavaScript |
 | **Computer Vision** | MediaPipe (Landmark Extraction), OpenCV |
 | **Deep Learning** | TensorFlow, Keras (LSTM Architecture) |
@@ -68,6 +91,8 @@ ISL-Project/
 ## ⚙️ Setup & Installation
 
 ### 1. Environment Setup
+**Requirement**: Python 3.10.6 (Recommended)
+
 Create a virtual environment and install the required packages:
 ```bash
 python -m venv .venv
