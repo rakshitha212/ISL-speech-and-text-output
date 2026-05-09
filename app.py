@@ -202,6 +202,10 @@ def about():
 def get_gesture():
     return jsonify({"word": current_word})
 
+@app.route("/current_prediction")
+def current_prediction():
+    return jsonify({"prediction": current_word})
+
 @app.route("/video_feed")
 def video_feed():
     def gen():
