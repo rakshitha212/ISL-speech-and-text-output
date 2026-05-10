@@ -158,6 +158,11 @@ document.addEventListener("DOMContentLoaded", function () {
       const recognizedTextLabel = document.getElementById("recognized-text");
       const gestureImgDisplay = document.getElementById("gesture-img-display");
       const gesturePlaceholder = document.getElementById("gesture-placeholder");
+
+      if (!micBtn) {
+        // New speech.html uses inline startSpeech() - nothing to bind here
+        return;
+      }
       
       let recognition;
       let isListening = false;
@@ -209,12 +214,8 @@ document.addEventListener("DOMContentLoaded", function () {
       }
 
       async function playGestureSequence(text) {
-        // Stop any currently running sequence
         clearTimeout(sequenceTimeout);
-        
-        // Prepare characters (only A-Z)
         const chars = text.replace(/[^A-Z]/g, '').split('');
-        
         if (chars.length === 0) return;
 
         gesturePlaceholder.style.display = "none";
@@ -222,17 +223,13 @@ document.addEventListener("DOMContentLoaded", function () {
 
         for (let i = 0; i < chars.length; i++) {
           const char = chars[i].toLowerCase();
-          // Update display
           gestureImgDisplay.src = `speech to sign/${char}.jpg`;
           recognizedTextLabel.innerHTML = `Signing: <strong>${text}</strong> (Letter: ${chars[i]})`;
-          
-          // Wait for 1 second
           await new Promise(resolve => {
             sequenceTimeout = setTimeout(resolve, 1000);
           });
         }
 
-        // Reset after sequence
         gestureImgDisplay.style.display = "none";
         gesturePlaceholder.style.display = "block";
         recognizedTextLabel.textContent = `Recognized: "${text}" (Done)`;

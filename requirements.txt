@@ -5,3 +5,4 @@ tensorflow==2.15.0
 numpy==1.26.4
 SpeechRecognition==3.16.1
 PyAudio==0.2.14
+scikit-learn==1.4.1.post1

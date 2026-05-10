@@ -9,6 +9,8 @@ import os
 import json
 import threading
 import time
+import train_model
+import shutil
 
 app = Flask(__name__)
 
@@ -21,14 +23,19 @@ LABELS_PATH = "model/labels.json"
 custom_model = None
 custom_labels = []
 
-if os.path.exists(CUSTOM_MODEL_PATH) and os.path.exists(LABELS_PATH):
-    try:
-        custom_model = tf.keras.models.load_model(CUSTOM_MODEL_PATH)
-        with open(LABELS_PATH, "r") as f:
-            custom_labels = json.load(f)
-        print(f"[INFO] Model loaded: {len(custom_labels)} classes")
-    except Exception as e:
-        print(f"[WARN] Model load failed: {e}")
+def reload_model():
+    """Reload the model from disk into global state. Called after training completes."""
+    global custom_model, custom_labels
+    if os.path.exists(CUSTOM_MODEL_PATH) and os.path.exists(LABELS_PATH):
+        try:
+            custom_model = tf.keras.models.load_model(CUSTOM_MODEL_PATH)
+            with open(LABELS_PATH, "r") as f:
+                custom_labels = json.load(f)
+            print(f"[INFO] Model reloaded: {len(custom_labels)} classes")
+        except Exception as e:
+            print(f"[WARN] Model reload failed: {e}")
+
+reload_model()
 
 # =========================
 # Global Shared State
@@ -39,6 +46,12 @@ current_status = "WAITING"
 detection_active = False
 camera_thread = None
 frame_lock = threading.Lock()
+
+# Data Collection State
+is_recording = False
+recording_word = ""
+recording_frames = []
+RECORDING_TARGET = 30
 
 # =========================
 # Camera Thread
@@ -52,6 +65,7 @@ def camera_loop():
     # Real-time buffer (3 seconds at 30fps)
     BUFFER_LEN = 90 
     seq = []
+    predictions_queue = []
     last_word = ""
     stable_count = 0
     cooldown_until = 0
@@ -115,67 +129,90 @@ def camera_loop():
         if len(seq) > BUFFER_LEN:
             seq.pop(0)
 
-        # =========================
-        # LSTM PREDICTION
-        # =========================
-        status_msg = "READY"
-        status_color = (0, 255, 0)
+        global is_recording, recording_frames, recording_word
         
-        if not res.left_hand_landmarks and not res.right_hand_landmarks:
-            status_msg = "NO HANDS DETECTED"
+        if is_recording:
+            status_msg = f"RECORDING {len(recording_frames)}/{RECORDING_TARGET}"
             status_color = (0, 0, 255)
-            current_status = "No Hands Detected"
-        elif not res.pose_landmarks:
-            status_msg = "BODY NOT DETECTED"
-            status_color = (0, 0, 255)
-            current_status = "Body Not Detected"
+            recording_frames.append(feats)
+            if len(recording_frames) >= RECORDING_TARGET:
+                # Save to npy
+                dataset_dir = os.path.join("dataset_custom", recording_word)
+                os.makedirs(dataset_dir, exist_ok=True)
+                timestamp = int(time.time() * 1000)
+                file_path = os.path.join(dataset_dir, f"seq_{timestamp}.npy")
+                np.save(file_path, np.array(recording_frames))
+                print(f"[INFO] Saved {file_path}")
+                is_recording = False
+                recording_frames = []
+                current_status = f"Saved 1 sample for '{recording_word}'"
         else:
-            current_status = "Analyzing..."
-            status_msg = "ANALYZING"
-            status_color = (255, 255, 0)
+            # =========================
+            # LSTM PREDICTION
+            # =========================
+            status_msg = "READY"
+            status_color = (0, 255, 0)
             
-            if custom_model is not None:
-                if len(seq) < BUFFER_LEN:
-                    current_status = f"Buffering... {len(seq)}/{BUFFER_LEN}"
-                else:
-                    # Check if we have enough movement to bother predicting
-                    recent_seq = np.array(seq[-30:])
-                    variance = np.var(recent_seq)
-                    
-                    # If variance is very low, hand is completely still, might be noise
-                    if variance > 0.0001:
-                        # Sub-sample 30 frames from the 90-frame buffer (every 3rd frame)
-                        sample_seq = seq[::3] 
-                        sequence = np.array(sample_seq)
+            if not res.left_hand_landmarks and not res.right_hand_landmarks:
+                status_msg = "NO HANDS DETECTED"
+                status_color = (0, 0, 255)
+                current_status = "No Hands Detected"
+            elif not res.pose_landmarks:
+                status_msg = "BODY NOT DETECTED"
+                status_color = (0, 0, 255)
+                current_status = "Body Not Detected"
+            else:
+                current_status = "Analyzing..."
+                status_msg = "ANALYZING"
+                status_color = (255, 255, 0)
+                
+                if custom_model is not None:
+                    if len(seq) < BUFFER_LEN:
+                        current_status = f"Buffering... {len(seq)}/{BUFFER_LEN}"
+                    else:
+                        recent_seq = np.array(seq[-30:])
+                        variance = np.var(recent_seq)
+                        
+                        if variance > 0.0001:
+                            sample_seq = seq[::3] 
+                            sequence = np.array(sample_seq)
 
-                        # NORMALIZATION
-                        sequence = sequence - sequence[0]
-                        sequence = sequence / (np.max(np.abs(sequence)) + 1e-6)
-                        sequence = sequence.reshape(1, 30, 150)
+                            # No baseline normalization to preserve absolute position relative to body
+                            sequence = sequence.reshape(1, 30, 150)
 
-                        pred = custom_model.predict(sequence, verbose=0)[0]
-                        conf = float(np.max(pred))
-                        word = custom_labels[int(np.argmax(pred))]
-
-                        # Stability & Output Logic
-                        if conf > 0.85: # Increased threshold
-                            if word == last_word:
-                                stable_count += 1
-                            else:
-                                stable_count = 0
-                                last_word = word
+                            pred = custom_model.predict(sequence, verbose=0)[0]
+                            predictions_queue.append(pred)
+                            if len(predictions_queue) > 5:
+                                predictions_queue.pop(0)
                             
-                            if stable_count >= 4: # Require more stable frames
-                                if time.time() > cooldown_until:
-                                    locked_word = word
-                                    current_status = "LOCKED"
-                                    cooldown_until = time.time() + 2.0 # 2s cooldown
+                            avg_pred = np.mean(predictions_queue, axis=0)
+                            conf = float(np.max(avg_pred))
+                            word = custom_labels[int(np.argmax(avg_pred))]
+
+                            # Stability & Output Logic
+                            if conf > 0.75: 
+                                if word != "Neutral":
+                                    if word == last_word:
+                                        stable_count += 1
+                                    else:
+                                        stable_count = 0
+                                        last_word = word
+                                    
+                                    if stable_count >= 3: 
+                                        if time.time() > cooldown_until:
+                                            locked_word = word
+                                            current_status = "LOCKED"
+                                            cooldown_until = time.time() + 2.0 
+                                        else:
+                                            current_status = "Cooldown..."
+                                    else:
+                                        current_status = f"Analyzing... {word} ({int(conf*100)}%)"
                                 else:
-                                    current_status = "Cooldown..."
-                            else:
-                                current_status = f"Analyzing... {word} ({int(conf*100)}%)"
-                        elif conf > 0.50:
-                            current_status = f"Analyzing... ({int(conf*100)}%)"
+                                    current_status = "Neutral Pose"
+                                    last_word = "Neutral"
+                                    stable_count = 0
+                            elif conf > 0.50:
+                                current_status = f"Analyzing... ({int(conf*100)}%)"
 
         if time.time() > cooldown_until and current_status != "LOCKED":
              locked_word = "" # Clear the locked word after cooldown if we are analyzing again
@@ -270,6 +307,148 @@ def toggle_detection():
 @app.route("/detection_status")
 def detection_status():
     return jsonify({"active": detection_active})
+
+@app.route("/train")
+def train_page():
+    return render_template("train.html")
+
+def get_active_words():
+    dataset_dir = "dataset_custom"
+    os.makedirs(dataset_dir, exist_ok=True)
+    active_file = os.path.join(dataset_dir, "active_words.json")
+    if not os.path.exists(active_file):
+        classes = sorted([d for d in os.listdir(dataset_dir) if os.path.isdir(os.path.join(dataset_dir, d))])
+        with open(active_file, "w") as f:
+            json.dump(classes, f)
+        return classes
+    with open(active_file, "r") as f:
+        return json.load(f)
+
+def save_active_words(words):
+    dataset_dir = "dataset_custom"
+    active_file = os.path.join(dataset_dir, "active_words.json")
+    with open(active_file, "w") as f:
+        json.dump(words, f)
+
+@app.route("/api/words", methods=["GET"])
+def api_words():
+    dataset_dir = "dataset_custom"
+    active_words = get_active_words()
+    words_data = []
+    for c in active_words:
+        folder_path = os.path.join(dataset_dir, c)
+        count = 0
+        if os.path.exists(folder_path):
+            count = len([f for f in os.listdir(folder_path) if f.endswith(".npy")])
+        words_data.append({"word": c, "count": count})
+    return jsonify(words_data)
+
+@app.route("/api/add_word", methods=["POST"])
+def api_add_word():
+    data = request.get_json()
+    word = data.get("word", "").strip()
+    if not word:
+        return jsonify({"success": False, "error": "Invalid word"}), 400
+        
+    dataset_dir = "dataset_custom"
+    folder_path = os.path.join(dataset_dir, word)
+    active_words = get_active_words()
+    
+    if word in active_words:
+        return jsonify({"success": False, "error": "Word is already in the list"}), 400
+        
+    if os.path.exists(folder_path):
+        return jsonify({"success": True, "exists": True})
+        
+    os.makedirs(folder_path, exist_ok=True)
+    active_words.append(word)
+    active_words.sort()
+    save_active_words(active_words)
+    return jsonify({"success": True, "exists": False})
+
+@app.route("/api/add_word_confirm", methods=["POST"])
+def api_add_word_confirm():
+    data = request.get_json()
+    word = data.get("word", "").strip()
+    reuse = data.get("reuse", True)
+    
+    if not word:
+        return jsonify({"success": False, "error": "Invalid word"}), 400
+        
+    dataset_dir = "dataset_custom"
+    folder_path = os.path.join(dataset_dir, word)
+    
+    if not reuse and os.path.exists(folder_path):
+        timestamp = int(time.time())
+        old_path = os.path.join(dataset_dir, f"{word}_old_{timestamp}")
+        os.rename(folder_path, old_path)
+        os.makedirs(folder_path, exist_ok=True)
+        
+    active_words = get_active_words()
+    if word not in active_words:
+        active_words.append(word)
+        active_words.sort()
+        save_active_words(active_words)
+        
+    return jsonify({"success": True})
+
+@app.route("/api/remove_word", methods=["POST"])
+def api_remove_word():
+    data = request.get_json()
+    word = data.get("word", "").strip()
+    delete_data = data.get("delete_data", False)
+    
+    if not word:
+         return jsonify({"success": False, "error": "Invalid word"}), 400
+         
+    active_words = get_active_words()
+    if word in active_words:
+        active_words.remove(word)
+        save_active_words(active_words)
+        
+    if delete_data:
+        folder_path = os.path.join("dataset_custom", word)
+        if os.path.exists(folder_path):
+            shutil.rmtree(folder_path)
+            
+    return jsonify({"success": True})
+
+@app.route("/api/record_start", methods=["POST"])
+def api_record_start():
+    global is_recording, recording_word, recording_frames, detection_active, camera_thread
+    data = request.get_json()
+    word = data.get("word", "")
+    if not word:
+        return jsonify({"success": False, "error": "Word is required"})
+    
+    if not detection_active:
+        detection_active = True
+        if camera_thread is None or not camera_thread.is_alive():
+            camera_thread = threading.Thread(target=camera_loop, daemon=True)
+            camera_thread.start()
+            
+    is_recording = True
+    recording_word = word
+    recording_frames = []
+    return jsonify({"success": True})
+
+@app.route("/api/record_status", methods=["GET"])
+def api_record_status():
+    return jsonify({"is_recording": is_recording})
+
+@app.route("/api/train_start", methods=["POST"])
+def api_train_start():
+    success, msg = train_model.start_training()
+    return jsonify({"success": success, "message": msg})
+
+@app.route("/api/train_status", methods=["GET"])
+def api_train_status():
+    status = train_model.get_training_status()
+    # If training just completed successfully, reload the model in this process
+    if status.get("reload_model"):
+        reload_model()
+        train_model.training_state["reload_model"] = False
+    return jsonify(status)
 
 # =========================
 # Speech to Sign
