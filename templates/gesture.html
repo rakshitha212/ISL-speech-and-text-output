@@ -56,6 +56,18 @@
                     </div>
                     <button id="enable-camera-btn" class="btn" style="margin-top: 20px;">Enable Camera</button>
                   </div>
+                  <!-- Camera Guidelines -->
+                  <div style="margin-top: 20px; padding: 15px; background: #f0f7ff; border-radius: 10px; border-left: 4px solid #2196F3;">
+                    <h4 style="margin: 0 0 10px 0; color: #1565C0;"><i class="fas fa-lightbulb"></i> Camera Guidelines</h4>
+                    <ul style="margin: 0; padding-left: 20px; font-size: 13px; color: #444; line-height: 1.8;">
+                      <li>Stand <strong>1-2 meters</strong> from the camera</li>
+                      <li>Face the camera directly with <strong>upper body visible</strong></li>
+                      <li>Ensure <strong>good lighting</strong> on your face and hands</li>
+                      <li>Keep <strong>both hands visible</strong> in the frame</li>
+                      <li>Perform the <strong>full gesture slowly</strong> and hold for 1-2 seconds</li>
+                      <li>Avoid cluttered backgrounds</li>
+                    </ul>
+                  </div>
               </div>
               
               <div class="result-panel">
@@ -69,6 +81,22 @@
                     </div>
                     <div style="margin-top: 20px; color: #7f8c8d; font-size: 14px; text-align: center;">
                         <i class="fas fa-info-circle"></i> Word will be automatically spoken when detected.
+                    </div>
+                  </div>
+                  <!-- Supported Words -->
+                  <div style="margin-top: 20px;">
+                    <div id="words-toggle" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; background: #f8f9fa; border-radius: 10px; border: 1px solid #e0e0e0; user-select: none;">
+                      <span style="font-weight: 600; color: #333;"><i class="fas fa-hands"></i> Supported Words (50)</span>
+                      <i id="words-chevron" class="fas fa-chevron-down" style="color: #666; transition: transform 0.3s;"></i>
+                    </div>
+                    <div id="words-list" style="display: none; margin-top: 8px; padding: 15px; background: #fafafa; border-radius: 10px; border: 1px solid #e0e0e0;">
+                      <div id="words-container" style="display: flex; flex-wrap: wrap; gap: 6px;"></div>
+                      <div style="margin-top: 12px; padding-top: 10px; border-top: 1px solid #eee; font-size: 12px; color: #888;">
+                        <i class="fas fa-external-link-alt"></i> 
+                        <a href="https://indiansignlanguage.org/" target="_blank" style="color: #1976D2;">ISL Dictionary</a> — 
+                        <a href="https://www.youtube.com/results?search_query=indian+sign+language+INCLUDE+gesture" target="_blank" style="color: #1976D2;">YouTube ISL Demo Videos</a> — 
+                        <a href="https://zenodo.org/record/4010759" target="_blank" style="color: #1976D2;">INCLUDE Dataset</a>
+                      </div>
                     </div>
                   </div>
               </div>
@@ -127,6 +155,26 @@
         const videoFeed = document.getElementById("video-feed");
         const cameraContainer = document.getElementById("camera-container");
         const placeholderContainer = document.getElementById("placeholder-container");
+
+        // Load supported words
+        fetch('/supported_words').then(r => r.json()).then(data => {
+            const container = document.getElementById('words-container');
+            data.words.forEach(w => {
+                const tag = document.createElement('span');
+                tag.textContent = w;
+                tag.style.cssText = 'padding: 4px 10px; background: #e3f2fd; color: #1565C0; border-radius: 15px; font-size: 12px; font-weight: 500;';
+                container.appendChild(tag);
+            });
+        });
+
+        // Toggle supported words section
+        document.getElementById('words-toggle').addEventListener('click', function() {
+            const list = document.getElementById('words-list');
+            const chevron = document.getElementById('words-chevron');
+            const isHidden = list.style.display === 'none';
+            list.style.display = isHidden ? 'block' : 'none';
+            chevron.style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
+        });
 
         function speak(text) {
             if ('speechSynthesis' in window) {

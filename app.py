@@ -9,6 +9,7 @@ import os
 import json
 import threading
 import time
+import torch
 
 app = Flask(__name__)
 
@@ -26,9 +27,34 @@ if os.path.exists(CUSTOM_MODEL_PATH) and os.path.exists(LABELS_PATH):
         custom_model = tf.keras.models.load_model(CUSTOM_MODEL_PATH)
         with open(LABELS_PATH, "r") as f:
             custom_labels = json.load(f)
-        print(f"[INFO] Model loaded: {len(custom_labels)} classes")
+        print(f"[INFO] LSTM Model loaded: {len(custom_labels)} classes")
     except Exception as e:
-        print(f"[WARN] Model load failed: {e}")
+        print(f"[WARN] LSTM Model load failed: {e}")
+
+# =========================
+# Load INCLUDE Transformer Model (for Gesture-to-Speech)
+# =========================
+INCLUDE_MODEL_PATH = "model/include50_transformer_small.pth"
+INCLUDE_LABELS_PATH = "model/include_labels.json"
+
+include_model = None
+include_labels = {}
+include_idx_to_label = {}
+
+if os.path.exists(INCLUDE_MODEL_PATH) and os.path.exists(INCLUDE_LABELS_PATH):
+    try:
+        from model.include_models import Transformer, TransformerConfig
+        config = TransformerConfig(size="small")
+        include_model = Transformer(config=config, n_classes=50)
+        ckpt = torch.load(INCLUDE_MODEL_PATH, map_location="cpu", weights_only=False)
+        include_model.load_state_dict(ckpt["model"])
+        include_model.eval()
+        with open(INCLUDE_LABELS_PATH, "r") as f:
+            include_labels = json.load(f)
+        include_idx_to_label = {v: k for k, v in include_labels.items()}
+        print(f"[INFO] INCLUDE Transformer Model loaded: {len(include_labels)} classes")
+    except Exception as e:
+        print(f"[WARN] INCLUDE Transformer Model load failed: {e}")
 
 # =========================
 # Global Shared State
@@ -49,12 +75,20 @@ def camera_loop():
     mp_hol = mp.solutions.holistic
     mp_draw = mp.solutions.drawing_utils
 
-    # Real-time buffer (3 seconds at 30fps)
-    BUFFER_LEN = 90 
+    # Buffer 2 seconds of frames (60 at 30fps) — INCLUDE model supports up to 256 positions
+    BUFFER_LEN = 60
+    INFER_EVERY = 5   # Run inference every 5 frames (~6 inferences/sec, reduces noise)
     seq = []
     last_word = ""
     stable_count = 0
     cooldown_until = 0
+    infer_count = 0
+    # Hand interpolation: carry forward last known position when hand briefly disappears
+    last_left_hand = None
+    last_right_hand = None
+    left_missing_frames = 0
+    right_missing_frames = 0
+    MAX_MISSING_FRAMES = 10
 
     cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
     if not cap.isOpened():
@@ -85,30 +119,51 @@ def camera_loop():
 
         feats = []
 
-        # Pose (66)
+        # INCLUDE training pipeline: raw x,y scaled to pixel coordinates (1920×1080)
+        # No per-frame normalization — model learned on pixel-scale absolute positions
+        FRAME_W, FRAME_H = 1920.0, 1080.0
+
+        # Upper body Pose (landmarks 0-24) → 25 keypoints × 2 coords = 50 features
         if res.pose_landmarks:
-            lh = res.pose_landmarks.landmark[23]
-            rh = res.pose_landmarks.landmark[24]
-            hx, hy = (lh.x + rh.x) / 2, (lh.y + rh.y) / 2
-            ls = res.pose_landmarks.landmark[11]
-            rs = res.pose_landmarks.landmark[12]
-            sd = np.sqrt((ls.x - rs.x) ** 2 + (ls.y - rs.y) ** 2) or 1
-
-            for lm in res.pose_landmarks.landmark:
-                feats.extend([(lm.x - hx) / sd, (lm.y - hy) / sd])
+            for i in range(25):
+                lm = res.pose_landmarks.landmark[i]
+                feats.extend([lm.x * FRAME_W, lm.y * FRAME_H])
         else:
-            feats.extend([0.0] * 66)
+            feats.extend([0.0] * 50)
 
-        # Hands (84)
-        for hand in [res.left_hand_landmarks, res.right_hand_landmarks]:
-            if hand:
-                wr = hand.landmark[0]
-                md = max(np.sqrt((lm.x - wr.x) ** 2 + (lm.y - wr.y) ** 2)
-                         for lm in hand.landmark) or 1
-                for lm in hand.landmark:
-                    feats.extend([(lm.x - wr.x) / md, (lm.y - wr.y) / md])
-            else:
-                feats.extend([0.0] * 42)
+        # Left hand (hand1 in INCLUDE convention) → 21 keypoints × 2 coords = 42 features
+        # Interpolate missing hands: carry forward last position (INCLUDE interpolates NaN)
+        if res.left_hand_landmarks:
+            lh_feats = []
+            for lm in res.left_hand_landmarks.landmark:
+                lh_feats.extend([lm.x * FRAME_W, lm.y * FRAME_H])
+            feats.extend(lh_feats)
+            last_left_hand = lh_feats[:]
+            left_missing_frames = 0
+        elif last_left_hand is not None and left_missing_frames < MAX_MISSING_FRAMES:
+            feats.extend(last_left_hand)
+            left_missing_frames += 1
+        else:
+            feats.extend([0.0] * 42)
+            last_left_hand = None
+            left_missing_frames = 0
+
+        # Right hand (hand2 in INCLUDE convention) → 21 keypoints × 2 coords = 42 features
+        if res.right_hand_landmarks:
+            rh_feats = []
+            for lm in res.right_hand_landmarks.landmark:
+                rh_feats.extend([lm.x * FRAME_W, lm.y * FRAME_H])
+            feats.extend(rh_feats)
+            last_right_hand = rh_feats[:]
+            right_missing_frames = 0
+        elif last_right_hand is not None and right_missing_frames < MAX_MISSING_FRAMES:
+            feats.extend(last_right_hand)
+            right_missing_frames += 1
+        else:
+            feats.extend([0.0] * 42)
+            last_right_hand = None
+            right_missing_frames = 0
+        # Total: 50 + 84 = 134 features
 
         # Add to sequence buffer
         seq.append(feats)
@@ -116,7 +171,7 @@ def camera_loop():
             seq.pop(0)
 
         # =========================
-        # LSTM PREDICTION
+        # GESTURE PREDICTION
         # =========================
         status_msg = "READY"
         status_color = (0, 255, 0)
@@ -134,48 +189,92 @@ def camera_loop():
             status_msg = "ANALYZING"
             status_color = (255, 255, 0)
             
-            if custom_model is not None:
+            if include_model is not None:
                 if len(seq) < BUFFER_LEN:
                     current_status = f"Buffering... {len(seq)}/{BUFFER_LEN}"
                 else:
-                    # Check if we have enough movement to bother predicting
-                    recent_seq = np.array(seq[-30:])
-                    variance = np.var(recent_seq)
-                    
-                    # If variance is very low, hand is completely still, might be noise
-                    if variance > 0.0001:
-                        # Sub-sample 30 frames from the 90-frame buffer (every 3rd frame)
-                        sample_seq = seq[::3] 
-                        sequence = np.array(sample_seq)
+                    infer_count += 1
+                    # Only run inference every INFER_EVERY frames to reduce noise & CPU
+                    if infer_count % INFER_EVERY == 0:
+                        # Feed BUFFER_LEN frames directly — model supports up to 256 positions
+                        # NO sequence-level normalization — INCLUDE model trained on raw pixel coords
+                        sequence = np.array(seq[-BUFFER_LEN:])
+                        sequence = sequence.reshape(1, BUFFER_LEN, 134)
 
-                        # NORMALIZATION
-                        sequence = sequence - sequence[0]
-                        sequence = sequence / (np.max(np.abs(sequence)) + 1e-6)
-                        sequence = sequence.reshape(1, 30, 150)
+                        # PyTorch inference with INCLUDE Transformer
+                        with torch.no_grad():
+                            input_tensor = torch.FloatTensor(sequence)
+                            pred = include_model(input_tensor)
+                            probs = torch.softmax(pred, dim=-1)
+                            conf = float(torch.max(probs))
+                            word_idx = int(torch.argmax(probs, dim=-1))
+                            word = include_idx_to_label.get(word_idx, "?")
 
-                        pred = custom_model.predict(sequence, verbose=0)[0]
-                        conf = float(np.max(pred))
-                        word = custom_labels[int(np.argmax(pred))]
+                        # Debug logging (every inference run)
+                        hands_status = f"L={'Y' if res.left_hand_landmarks else 'N'} R={'Y' if res.right_hand_landmarks else 'N'}"
+                        top3 = torch.topk(probs[0], 3)
+                        top3_str = ", ".join(
+                            f"{include_idx_to_label[int(top3.indices[i])]}={float(top3.values[i]):.2f}"
+                            for i in range(3)
+                        )
+                        print(f"[DEBUG] pred={word} conf={conf:.3f} | {hands_status} | top3: {top3_str}")
 
                         # Stability & Output Logic
-                        if conf > 0.85: # Increased threshold
+                        if conf > 0.40:
                             if word == last_word:
                                 stable_count += 1
                             else:
                                 stable_count = 0
                                 last_word = word
                             
-                            if stable_count >= 4: # Require more stable frames
+                            if stable_count >= 3:
                                 if time.time() > cooldown_until:
                                     locked_word = word
                                     current_status = "LOCKED"
-                                    cooldown_until = time.time() + 2.0 # 2s cooldown
+                                    cooldown_until = time.time() + 2.0
                                 else:
                                     current_status = "Cooldown..."
                             else:
                                 current_status = f"Analyzing... {word} ({int(conf*100)}%)"
-                        elif conf > 0.50:
+                        elif conf > 0.10:
                             current_status = f"Analyzing... ({int(conf*100)}%)"
+                    # else: keep previous current_status (no update between inference runs)
+            elif custom_model is not None:
+                # Fallback to old LSTM model if INCLUDE model not loaded
+                LSTM_SEQ_LEN = 30
+                if len(seq) < LSTM_SEQ_LEN:
+                    current_status = f"Buffering... {len(seq)}/{LSTM_SEQ_LEN}"
+                else:
+                    sequence = np.array(seq[-LSTM_SEQ_LEN:])
+                    sequence = sequence - sequence[0]
+                    sequence = sequence / (np.max(np.abs(sequence)) + 1e-6)
+                    # Pad features from 134 to 150 for old LSTM
+                    if sequence.shape[1] == 134:
+                        pad_feats = np.zeros((sequence.shape[0], 16))
+                        sequence = np.hstack((sequence, pad_feats))
+                    sequence = sequence.reshape(1, 30, 150)
+
+                    pred = custom_model.predict(sequence, verbose=0)[0]
+                    conf = float(np.max(pred))
+                    word = custom_labels[int(np.argmax(pred))]
+
+                    if conf > 0.85:
+                        if word == last_word:
+                            stable_count += 1
+                        else:
+                            stable_count = 0
+                            last_word = word
+                        if stable_count >= 4:
+                            if time.time() > cooldown_until:
+                                locked_word = word
+                                current_status = "LOCKED"
+                                cooldown_until = time.time() + 2.0
+                            else:
+                                current_status = "Cooldown..."
+                        else:
+                            current_status = f"Analyzing... {word} ({int(conf*100)}%)"
+                    elif conf > 0.50:
+                        current_status = f"Analyzing... ({int(conf*100)}%)"
 
         if time.time() > cooldown_until and current_status != "LOCKED":
              locked_word = "" # Clear the locked word after cooldown if we are analyzing again
@@ -270,6 +369,11 @@ def toggle_detection():
 @app.route("/detection_status")
 def detection_status():
     return jsonify({"active": detection_active})
+
+@app.route("/supported_words")
+def supported_words():
+    words = sorted(include_labels.keys()) if include_labels else []
+    return jsonify({"words": words, "count": len(words)})
 
 # =========================
 # Speech to Sign
