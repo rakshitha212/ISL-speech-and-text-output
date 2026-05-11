@@ -98,7 +98,7 @@ This project introduces a **dynamic data collection and model training pipeline*
 
 | Layer | Technology |
 |---|---|
-| **Backend** | Python 3.10, Flask 3.1 |
+| **Backend** | Python 3.10.6, Flask 3.1 |
 | **Frontend** | HTML5, CSS3, Vanilla JavaScript |
 | **Computer Vision** | MediaPipe (Holistic Landmark Detection), OpenCV |
 | **Deep Learning** | TensorFlow 2.15, Keras (LSTM) |
