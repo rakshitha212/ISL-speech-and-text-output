@@ -31,6 +31,13 @@
     padding: 0 20px;
   }
   
+  .container-fluid {
+    width: 100%;
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 0 40px;
+  }
+  
   /* Header */
   header {
     background: linear-gradient(135deg, var(--primary), #2980b9);
@@ -259,6 +266,16 @@
     box-shadow: var(--shadow);
   }
   
+  .gesture-container {
+    max-width: 1400px;
+    width: 95%;
+    margin: 0 auto;
+    background-color: white;
+    border-radius: 10px;
+    padding: 40px;
+    box-shadow: var(--shadow);
+  }
+  
   .conversion-header {
     text-align: center;
     margin-bottom: 40px;
@@ -276,10 +293,14 @@
   
   .conversion-box {
     border: 2px dashed #bdc3c7;
-    padding: 40px;
+    padding: 30px;
     text-align: center;
     border-radius: 10px;
-    margin-bottom: 30px;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
   }
   
   .conversion-box i {
@@ -293,11 +314,32 @@
     color: var(--dark);
   }
   
+  .split-layout {
+    display: flex;
+    gap: 30px;
+    align-items: stretch;
+  }
+  
+  .camera-panel {
+    flex: 6;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .result-panel {
+    flex: 4;
+    display: flex;
+    flex-direction: column;
+  }
+  
   .conversion-result {
     background-color: var(--light);
-    padding: 20px;
+    padding: 30px;
     border-radius: 10px;
-    margin-top: 30px;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
   }
   
   .conversion-result h3 {
@@ -432,5 +474,10 @@
   
     .feature-card {
       flex: 1 1 100%;
+    }
+    
+    .split-layout {
+      flex-direction: column;
+      gap: 20px;
     }
   }

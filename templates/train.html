@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dataset Training - Indian Sign Language Detection</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+    <!-- Font Awesome for icons -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+    />
+    <style>
+      .word-list {
+        max-height: 200px;
+        overflow-y: auto;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        margin-bottom: 15px;
+      }
+      .word-item {
+        padding: 10px;
+        border-bottom: 1px solid #eee;
+        display: flex;
+        justify-content: space-between;
+        cursor: pointer;
+      }
+      .word-item:hover {
+        background: #f8f9fa;
+      }
+      .word-item.selected {
+        background: #e2e6ea;
+        font-weight: bold;
+      }
+      .word-count {
+        background: var(--primary);
+        color: white;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+      }
+      .progress-bar {
+        width: 100%;
+        background-color: #f3f3f3;
+        border-radius: 5px;
+        margin-top: 10px;
+        display: none;
+      }
+      .progress {
+        width: 0%;
+        height: 20px;
+        background-color: #4CAF50;
+        border-radius: 5px;
+        transition: width 0.4s ease;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Header -->
+    <header id="header">
+      <div class="container">
+        <nav>
+          <div class="logo"><i class="fas fa-sign-language"></i> ISLD</div>
+          <ul class="nav-links">
+            <li><a href="/">Home</a></li>
+            <li><a href="/gesture">Gesture to Speech</a></li>
+            <li><a href="/speech">Speech to Gesture</a></li>
+            <li><a href="/train" class="active">Train Model</a></li>
+            <li><a href="/about">About</a></li>
+          </ul>
+          <div class="hamburger">
+            <i class="fas fa-bars"></i>
+          </div>
+        </nav>
+      </div>
+    </header>
+
+    <!-- Training Page -->
+    <section id="training-page" class="conversion-page">
+      <div class="container-fluid">
+        <div class="gesture-container">
+          <div class="conversion-header">
+            <h1>Dynamic Dataset Collection & Training</h1>
+            <p>
+              Record your own hand gestures and train the model in real-time for maximum accuracy.
+            </p>
+          </div>
+          <div class="split-layout">
+              <!-- Left Column: Camera -->
+              <div class="camera-panel">
+                  <div class="conversion-box">
+                    <div id="camera-container" style="display: none; margin-bottom: 20px; width: 100%;">
+                      <img id="video-feed" style="width: 100%; border-radius: 10px; border: 3px solid var(--primary);" />
+                    </div>
+                    <div id="placeholder-container">
+                      <i class="fas fa-camera"></i>
+                      <h3>Camera Access</h3>
+                      <p>
+                        Enable camera to record gesture data.
+                      </p>
+                    </div>
+                    <button id="enable-camera-btn" class="btn" style="margin-top: 20px;">Enable Camera</button>
+                    
+                    <div id="recording-status" style="margin-top: 15px; font-weight: bold; color: #e74c3c; display: none;">
+                        <i class="fas fa-circle" style="animation: pulse 1s infinite;"></i> Recording... Please perform the gesture.
+                    </div>
+                  </div>
+              </div>
+              
+              <!-- Right Column: Controls -->
+              <div class="result-panel">
+                  <div class="conversion-result" style="text-align: left;">
+                      <h3>1. Select or Add Word</h3>
+                      <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                          <input type="text" id="new-word-input" placeholder="Enter new word..." style="flex-grow: 1; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                          <button id="add-word-btn" class="btn" style="padding: 8px 15px;"><i class="fas fa-plus"></i></button>
+                      </div>
+                      
+                      <div class="word-list" id="word-list-container">
+                          <!-- Populated via JS -->
+                      </div>
+
+                      <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #eee;">
+                          <h3>2. Record Data</h3>
+                          <p style="font-size: 14px; color: #666;">Select a word above, then click record. You have 1 second to perform the gesture (30 frames).</p>
+                          <button id="record-btn" class="btn" style="width: 100%; background-color: #e74c3c;" disabled>
+                              <i class="fas fa-video"></i> Record 30 Frames
+                          </button>
+                      </div>
+
+                      <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #eee;">
+                          <h3>3. Train Model</h3>
+                          <p style="font-size: 14px; color: #666;">Once you have enough samples (aim for 30+ per word), retrain the model.</p>
+                          <button id="train-btn" class="btn" style="width: 100%; background-color: #2ecc71;">
+                              <i class="fas fa-brain"></i> Start Training
+                          </button>
+                          
+                          <div class="progress-bar" id="training-progress-container">
+                            <div class="progress" id="training-progress"></div>
+                          </div>
+                          <p id="training-status-text" style="font-size: 12px; margin-top: 5px; color: #666;"></p>
+                      </div>
+                  </div>
+              </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+      <div class="container">
+        <div class="footer-content">
+          <div class="footer-column">
+            <!-- Empty column for layout balance -->
+          </div>
+          <div class="footer-column">
+            <h3>Navigation</h3>
+            <ul>
+              <li><a href="/">Home</a></li>
+              <li><a href="/gesture">Gesture to Speech</a></li>
+              <li><a href="/speech">Speech to Gesture</a></li>
+              <li><a href="/train">Train Model</a></li>
+              <li><a href="/about">About</a></li>
+            </ul>
+          </div>
+          <div class="footer-column">
+            <h3>Contact Us</h3>
+            <ul>
+              <li><i class="fas fa-envelope"></i> Jupiterking technology.com</li>
+              <li><i class="fas fa-phone"></i> +91 1234567890</li>
+              <li><i class="fas fa-map-marker-alt"></i> karnataka, India</li>
+            </ul>
+          </div>
+        </div>
+        <div class="copyright">
+          <p>&copy; 2025 Indian Sign Language Detection Project. All rights reserved.</p>
+        </div>
+      </div>
+    </footer>
+
+    <!-- JavaScript -->
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <script>
+        let isCameraActive = false;
+        let selectedWord = null;
+        let trainingInterval = null;
+
+        const enableBtn = document.getElementById("enable-camera-btn");
+        const videoFeed = document.getElementById("video-feed");
+        const cameraContainer = document.getElementById("camera-container");
+        const placeholderContainer = document.getElementById("placeholder-container");
+        
+        const wordListContainer = document.getElementById("word-list-container");
+        const newWordInput = document.getElementById("new-word-input");
+        const addWordBtn = document.getElementById("add-word-btn");
+        const recordBtn = document.getElementById("record-btn");
+        const recordingStatus = document.getElementById("recording-status");
+        
+        const trainBtn = document.getElementById("train-btn");
+        const progressContainer = document.getElementById("training-progress-container");
+        const progressBar = document.getElementById("training-progress");
+        const statusText = document.getElementById("training-status-text");
+
+        // --- CAMERA LOGIC ---
+        enableBtn.addEventListener("click", async function() {
+            if (!isCameraActive) {
+                isCameraActive = true;
+                enableBtn.textContent = "Starting...";
+                enableBtn.disabled = true;
+                
+                try {
+                    await fetch('/toggle_detection', { 
+                        method: 'POST', 
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({active: true}) 
+                    });
+                } catch(e) {}
+
+                setTimeout(() => {
+                    videoFeed.src = "{{ url_for('video_feed') }}";
+                    cameraContainer.style.display = "block";
+                    placeholderContainer.style.display = "none";
+                    enableBtn.textContent = "Stop Camera";
+                    enableBtn.disabled = false;
+                }, 1000);
+            } else {
+                isCameraActive = false;
+                enableBtn.disabled = true;
+                enableBtn.textContent = "Stopping...";
+                
+                try {
+                    await fetch('/toggle_detection', { 
+                        method: 'POST', 
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({active: false}) 
+                    });
+                } catch(e) {}
+                
+                setTimeout(() => {
+                    videoFeed.src = "";
+                    cameraContainer.style.display = "none";
+                    placeholderContainer.style.display = "block";
+                    enableBtn.textContent = "Enable Camera";
+                    enableBtn.disabled = false;
+                }, 500);
+            }
+        });
+
+        // --- WORD LIST LOGIC ---
+        async function fetchWords() {
+            const res = await fetch('/api/words');
+            const data = await res.json();
+            wordListContainer.innerHTML = "";
+            data.forEach(item => {
+                const div = document.createElement("div");
+                div.className = "word-item" + (selectedWord === item.word ? " selected" : "");
+                
+                const spanContainer = document.createElement("div");
+                spanContainer.style.display = "flex";
+                spanContainer.style.alignItems = "center";
+                spanContainer.style.gap = "10px";
+                spanContainer.innerHTML = `<span>${item.word}</span><span class="word-count">${item.count}</span>`;
+                
+                const deleteBtn = document.createElement("i");
+                deleteBtn.className = "fas fa-trash";
+                deleteBtn.style.color = "#e74c3c";
+                deleteBtn.style.cursor = "pointer";
+                deleteBtn.title = "Remove word";
+                deleteBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    removeWord(item.word, item.count);
+                };
+                
+                div.appendChild(spanContainer);
+                div.appendChild(deleteBtn);
+
+                div.onclick = () => {
+                    selectedWord = item.word;
+                    recordBtn.disabled = false;
+                    fetchWords(); // re-render to update selected styling
+                };
+                wordListContainer.appendChild(div);
+            });
+        }
+
+        async function removeWord(word, count) {
+            let deleteData = false;
+            if (count > 0) {
+                const wantsToDeleteData = confirm(`Dataset found for '${word}' (${count} samples).\nDo you want to permanently delete this data as well?\n\nClick OK to delete the data.\nClick Cancel to keep the data but remove the word from the active training list.`);
+                deleteData = wantsToDeleteData;
+            }
+            
+            await fetch('/api/remove_word', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({word: word, delete_data: deleteData})
+            });
+            if (selectedWord === word) {
+                selectedWord = null;
+                recordBtn.disabled = true;
+            }
+            fetchWords();
+        }
+
+        addWordBtn.addEventListener("click", async () => {
+            const word = newWordInput.value.trim();
+            if (word) {
+                const res = await fetch('/api/add_word', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({word: word})
+                });
+                const data = await res.json();
+                
+                if (data.exists) {
+                    const reuse = confirm(`A dataset for '${word}' already exists.\n\nClick OK to reuse this existing dataset.\nClick Cancel to create a brand new dataset (the old one will be archived).`);
+                    await fetch('/api/add_word_confirm', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({word: word, reuse: reuse})
+                    });
+                } else if (!data.success) {
+                    alert(data.error);
+                }
+                
+                newWordInput.value = "";
+                fetchWords();
+            }
+        });
+
+        // --- RECORDING LOGIC ---
+        recordBtn.addEventListener("click", async () => {
+            if (!isCameraActive) {
+                alert("Please enable the camera first!");
+                return;
+            }
+            if (!selectedWord) return;
+
+            recordBtn.disabled = true;
+            recordBtn.innerHTML = '<i class="fas fa-circle" style="color:#e74c3c"></i> Recording...';
+            recordingStatus.style.display = "block";
+
+            await fetch('/api/record_start', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({word: selectedWord})
+            });
+
+            // Poll the backend every 300ms until recording finishes
+            const pollRecording = setInterval(async () => {
+                const res = await fetch('/api/record_status');
+                const data = await res.json();
+                if (!data.is_recording) {
+                    clearInterval(pollRecording);
+                    recordingStatus.style.display = "none";
+                    recordBtn.disabled = false;
+                    recordBtn.innerHTML = '<i class="fas fa-video"></i> Record 30 Frames';
+                    fetchWords(); // Update count
+                }
+            }, 300);
+        });
+
+        // --- TRAINING LOGIC ---
+        trainBtn.addEventListener("click", async () => {
+            const resWords = await fetch('/api/words');
+            const wordsData = await resWords.json();
+            const totalSamples = wordsData.reduce((acc, curr) => acc + curr.count, 0);
+            
+            if (totalSamples === 0) {
+                alert("Please record some gesture data before starting training!");
+                return;
+            }
+
+            // Disable immediately before the API call
+            trainBtn.disabled = true;
+            trainBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting...';
+            statusText.textContent = "Initializing...";
+            statusText.style.color = "#666";
+            progressContainer.style.display = "block";
+            progressBar.style.width = "0%";
+
+            const res = await fetch('/api/train_start', {method: 'POST'});
+            const data = await res.json();
+            if (data.success) {
+                trainingInterval = setInterval(checkTrainingStatus, 1000);
+            } else {
+                alert(data.message);
+                trainBtn.disabled = false;
+                trainBtn.innerHTML = '<i class="fas fa-brain"></i> Start Training';
+            }
+        });
+
+        async function checkTrainingStatus() {
+            const res = await fetch('/api/train_status');
+            const data = await res.json();
+            
+            if (data.is_training) {
+                progressContainer.style.display = "block";
+                progressBar.style.width = data.progress + "%";
+                statusText.textContent = data.message;
+                trainBtn.disabled = true;
+                trainBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Training...';
+            } else {
+                if (trainingInterval) {
+                    clearInterval(trainingInterval);
+                    trainingInterval = null;
+                }
+                trainBtn.disabled = false;
+                trainBtn.innerHTML = '<i class="fas fa-brain"></i> Start Training';
+                if (data.progress === 100) {
+                    progressBar.style.width = "100%";
+                    statusText.textContent = "✅ Model trained & reloaded! You can start detecting immediately.";
+                    statusText.style.color = "green";
+                } else if (data.error) {
+                    statusText.textContent = data.message;
+                    statusText.style.color = "red";
+                }
+            }
+        }
+
+
+        // Initial Load
+        fetchWords();
+        // Resume polling if training was already in progress when page loaded
+        fetch('/api/train_status').then(r => r.json()).then(d => {
+            if (d.is_training) {
+                trainBtn.disabled = true;
+                trainBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Training...';
+                progressContainer.style.display = "block";
+                trainingInterval = setInterval(checkTrainingStatus, 1000);
+            } else if (d.progress === 100 && !d.error) {
+                progressContainer.style.display = "block";
+                progressBar.style.width = "100%";
+                statusText.textContent = "✅ Model trained & reloaded! You can start detecting immediately.";
+                statusText.style.color = "green";
+            }
+        });
+    </script>
+  </body>
+</html>
