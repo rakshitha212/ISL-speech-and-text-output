@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Indian Sign Language Detection</title>
+    <title>Sign Language Detection</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
     <!-- Font Awesome for icons -->
     <link
@@ -16,7 +16,7 @@
     <header id="header">
       <div class="container">
         <nav>
-          <div class="logo"><i class="fas fa-sign-language"></i> ISLD</div>
+          <div class="logo"><i class="fas fa-sign-language"></i> SLD</div>
           <ul class="nav-links">
             <li><a href="/" class="active">Home</a></li>
             <li><a href="/gesture">Gesture to Speech</a></li>
@@ -36,7 +36,7 @@
       <!-- Hero Section -->
       <div class="hero">
         <div class="container">
-          <h1>Indian Sign Language Detection</h1>
+          <h1>Sign Language Detection</h1>
           <p>
             Breaking barriers in communication with cutting-edge technology that
             translates sign language to text and speech, making communication
@@ -48,14 +48,12 @@
         </div>
       </div>
 
-      <!-- Features Section -->
       <div class="features">
         <div class="container">
           <div class="section-title">
             <h2>Our Features</h2>
             <p>
-              Our technology provides seamless translation and communication
-              options for sign language users.
+              Advanced AI solutions providing seamless communication tools for the sign language community.
             </p>
           </div>
           <div class="features-container">
@@ -65,9 +63,9 @@
               </div>
               <h3>Gesture to Speech</h3>
               <p>
-                Translate sign language gestures directly into spoken words,
-                enabling verbal communication.
+                Translate sign language gestures directly into spoken words in real-time using advanced neural networks.
               </p>
+              <a href="/gesture" class="card-link">Try Gesture Detection <i class="fas fa-arrow-right"></i></a>
             </div>
             <div class="feature-card">
               <div class="feature-icon">
@@ -75,9 +73,19 @@
               </div>
               <h3>Speech to Gesture</h3>
               <p>
-                Convert spoken words into animated sign language gestures for
-                better understanding.
+                Convert spoken words and phrases into high-quality sign language videos or letter animations.
               </p>
+              <a href="/speech" class="card-link">Try Speech to Sign <i class="fas fa-arrow-right"></i></a>
+            </div>
+            <div class="feature-card">
+              <div class="feature-icon">
+                <i class="fas fa-brain"></i>
+              </div>
+              <h3>Custom Training</h3>
+              <p>
+                Record your own gestures and train a personalized model directly in your browser with zero code.
+              </p>
+              <a href="/train" class="card-link">Personalize Model <i class="fas fa-arrow-right"></i></a>
             </div>
           </div>
         </div>
@@ -96,7 +104,7 @@
                 between the hearing and hearing-impaired communities.
               </p>
               <p>
-                Our Indian Sign Language Detection technology seeks to bridge
+                Our Sign Language Detection technology seeks to bridge
                 this gap by using artificial intelligence and computer vision to
                 interpret sign language in real-time, providing text and speech
                 outputs that make communication more accessible.
@@ -146,7 +154,7 @@
         </div>
         <div class="copyright">
           <p>
-            &copy; 2025 Indian Sign Language Detection Project. All rights
+            &copy; 2025 Sign Language Detection Project. All rights
             reserved.
           </p>
         </div>

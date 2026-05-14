@@ -1,8 +1,8 @@
-# 🤟 Indian Sign Language Detection (ISLD)
+# 🤟 Sign Language Detection (SLD)
 
 > **Breaking barriers in communication with AI-powered, real-time Sign Language translation.**
 
-A full-stack web application that provides two-way communication between Indian Sign Language (ISL) and spoken/written language — empowering the deaf and hard-of-hearing community through the power of computer vision and deep learning.
+A full-stack web application that provides two-way communication between sign language and spoken/written language — empowering the deaf and hard-of-hearing community through the power of computer vision and deep learning.
 
 ---
 
@@ -33,7 +33,7 @@ A full-stack web application that provides two-way communication between Indian 
 
 In India, over **63 million people** rely on sign language as their primary means of communication. Despite this, a significant communication gap exists between the hearing and hearing-impaired communities in everyday environments — hospitals, schools, government offices, and public spaces.
 
-The **Indian Sign Language Detection (ISLD)** system bridges this gap by using:
+The **Sign Language Detection (SLD)** system bridges this gap by using:
 - **MediaPipe** for precise, real-time hand and pose landmark extraction from a standard webcam.
 - **LSTM Neural Networks** that analyse sequences of 30 frames to understand the temporal nature of gestures (movement over time, not just static poses).
 - A unique **in-browser training pipeline** that allows anyone to build a personalized, high-accuracy model without touching a single line of code.
@@ -44,8 +44,8 @@ The **Indian Sign Language Detection (ISLD)** system bridges this gap by using:
 
 | Feature | Description |
 |---|---|
-| ✋ **Gesture to Speech** | Real-time LSTM-based recognition of ISL gestures, converted to text and spoken aloud. |
-| 🎤 **Speech to Gesture** | Spoken words transcribed via Google Speech API and displayed as ISL sign videos or letter animations. |
+| ✋ **Gesture to Speech** | Real-time LSTM-based recognition of sign language gestures, converted to text and spoken aloud. |
+| 🎤 **Speech to Gesture** | Spoken words transcribed via Google Speech API and displayed as sign language videos or letter animations. |
 | 🧠 **Custom Model Training** | Record your own gesture dataset in-browser and retrain the LSTM model with a single click. |
 | 🔄 **Hot Model Reload** | After training, the new model is automatically loaded into memory — no server restart needed. |
 | ➕ **Dynamic Word Management** | Add or remove gesture classes at any time; choose to retain, archive, or delete associated data. |
@@ -198,7 +198,7 @@ Open your browser and navigate to: **[http://127.0.0.1:5000](http://127.0.0.1:50
 
 1. Navigate to **Gesture to Speech** from the top navigation bar.
 2. Click **Enable Camera** — your webcam feed will appear.
-3. Perform an ISL gesture in front of the camera.
+3. Perform a sign language gesture in front of the camera.
 4. The detected word will appear in the **Detected Word** panel and be spoken aloud automatically.
 
 > **Note:** You must train a custom model first (see below) to get accurate results.
@@ -211,8 +211,8 @@ Open your browser and navigate to: **[http://127.0.0.1:5000](http://127.0.0.1:50
 2. Click **Enable Microphone** and speak a word clearly.
 3. The system will:
    - Display the recognized text.
-   - Play the matching ISL sign video from the library, **or**
-   - Spell it out letter-by-letter using ISL finger-spelling GIFs if no video is found.
+   - Play the matching sign language video from the library, **or**
+   - Spell it out letter-by-letter using sign language finger-spelling GIFs if no video is found.
 
 ---
 
@@ -307,4 +307,4 @@ Distributed under the MIT License. See `LICENSE` for more information.
 
 ---
 
-&copy; 2026 Indian Sign Language Detection Project · Jupiter King Technology · Karnataka, India
+&copy; 2026 Sign Language Detection Project · Jupiter King Technology · Karnataka, India

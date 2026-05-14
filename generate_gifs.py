@@ -35,7 +35,7 @@ def generate_letter_gif(letter, filename):
     bbox = d.textbbox((0, 0), letter_upper, font=fnt_large)
     tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
     d.text(((200 - tw) / 2, (200 - th) / 2 - 15), letter_upper, font=fnt_large, fill='white')
-    d.text((10, 170), f"ISL: {letter_upper}", font=fnt_small, fill='white')
+    d.text((10, 170), f"Sign: {letter_upper}", font=fnt_small, fill='white')
 
     os.makedirs('static/gestures', exist_ok=True)
     img.save(f'static/gestures/{filename}', 'GIF')
@@ -53,7 +53,7 @@ def generate_word_gif(word, filename):
         fnt = ImageFont.load_default()
         fnt_small = ImageFont.load_default()
 
-    d.text((20, 20), "ISL Sign:", font=fnt_small, fill=(200, 200, 200))
+    d.text((20, 20), "Sign Language:", font=fnt_small, fill=(200, 200, 200))
     bbox = d.textbbox((0, 0), word, font=fnt)
     tw = bbox[2] - bbox[0]
     d.text(((400 - tw) / 2, 90), word, font=fnt, fill='white')
